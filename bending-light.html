@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Bending Light</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Nunito+Sans:wght@400;600&display=swap">
+<style>
+:root{color-scheme:light;box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+[hidden]{display:none!important}
+img{max-width:100%}
+/* Layout: one big ray diagram on top, controls beneath, a live readout strip, then a short "what to notice" list. */
+:root{
+  --bg:#f3f6f8; --panel:#ffffff; --fg:#14262e; --muted:#5a6f78; --line:#d3dde2;
+  --air:#eef5f9; --glass:#bfe3ef; --ray:#d9480f; --ray-soft:#f0a27c; --accent:#0b7285; --ok:#2b8a3e; --warn:#c2255c;
+  --font-display:'Bricolage Grotesque',system-ui,sans-serif; --font-body:'Nunito Sans',system-ui,sans-serif; --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1a20; --panel:#14262e; --fg:#e6f0f3; --muted:#93aab3; --line:#26414b;
+  --air:#10222a; --glass:#12475a; --ray:#ffa94d; --ray-soft:#9c6a3a; --accent:#66d9e8; --ok:#69db7c; --warn:#faa2c1; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1a20; --panel:#14262e; --fg:#e6f0f3; --muted:#93aab3; --line:#26414b;
+  --air:#10222a; --glass:#12475a; --ray:#ffa94d; --ray-soft:#9c6a3a; --accent:#66d9e8; --ok:#69db7c; --warn:#faa2c1; color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:16px;line-height:1.5;
+  padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--font-display);font-size:clamp(1.7rem,5vw,2.4rem);line-height:1.1;margin:0;text-wrap:balance}
+.sub{margin:4px 0 0;color:var(--muted);max-width:60ch}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+svg{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
+#handle{cursor:grab}
+#handle:focus-visible{outline:none}
+#handle:focus-visible .hring{stroke:var(--fg);stroke-width:3}
+svg.drag,svg.drag #handle{cursor:grabbing}
+.hring{fill:var(--panel);stroke:var(--ray);stroke-width:3}
+.tag{font-family:var(--font-mono);font-size:13px;fill:var(--muted)}
+.tag-b{font-family:var(--font-mono);font-size:15px;font-weight:500}
+.ctl{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:620px){.ctl{grid-template-columns:1fr}}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.lab{font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:600;font-size:14px;background:var(--bg)}
+.seg input:checked+label{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+.seg input:focus-visible+label{outline:2px solid var(--fg);outline-offset:2px}
+input[type=range]{width:100%;accent-color:var(--accent);height:28px}
+.big{font-family:var(--font-mono);font-size:1.5rem;font-weight:500}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+button{font:inherit;font-weight:600;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:6px 12px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.stat .v{font-family:var(--font-mono);font-size:1.25rem;font-weight:500;font-variant-numeric:tabular-nums}
+.stat .k{font-size:13px;color:var(--muted)}
+.verdict{border-radius:12px;padding:14px 16px;font-weight:600;border:1px solid var(--line);background:var(--panel)}
+.verdict.tir{border-color:var(--warn);color:var(--warn)}
+.verdict small{display:block;font-weight:400;color:var(--muted);margin-top:2px;font-size:14px}
+.notice{margin:0;padding-left:1.1em;color:var(--fg)}
+.notice li{margin-bottom:4px}
+.ray{fill:none;stroke:var(--ray);stroke-width:3.5;stroke-linecap:round;stroke-dasharray:3 11;animation:flow .9s linear infinite}
+.ray.solid{stroke-dasharray:none;animation:none;opacity:.28}
+.ray.refl{stroke:var(--ray);}
+@keyframes flow{to{stroke-dashoffset:-14}}
+@media(prefers-reduced-motion:reduce){.ray{animation:none;stroke-dasharray:none}}
+.arc{fill:none;stroke:var(--accent);stroke-width:2}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+.fld label{display:block;font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.fld input{width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:1.25rem;font-weight:500;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);font-variant-numeric:tabular-nums}
+.fld input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.hint{font-size:13px;color:var(--muted);margin:0 0 6px}
+.hint.bad{color:var(--warn)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Bending Light</h1>
+    <p class="sub">Refraction and total internal reflection. Drag the ray in the diagram, or use the slider, and watch what the ray does at the boundary.</p>
+  </header>
+
+  <div class="stage">
+    <svg id="svg" viewBox="0 0 600 420" role="img" aria-label="Ray diagram showing incident, reflected and refracted rays at an air and material boundary">
+      <rect id="topFill" x="0" y="0" width="600" height="210" fill="var(--air)"/>
+      <rect id="botFill" x="0" y="210" width="600" height="210" fill="var(--glass)"/>
+      <line x1="0" y1="210" x2="600" y2="210" stroke="var(--fg)" stroke-width="1.5"/>
+      <line x1="300" y1="30" x2="300" y2="390" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="6 5"/>
+      <text class="tag" x="308" y="44">normal</text>
+      <text class="tag" x="14" y="28" id="topName">Air</text>
+      <text class="tag" x="14" y="408" id="botName">Water</text>
+      <path id="arcI" class="arc" d=""/>
+      <path id="arcR" class="arc" d=""/>
+      <path id="reflRay" class="ray solid refl" d=""/>
+      <path id="inRay" class="ray" d=""/>
+      <path id="outRay" class="ray" d=""/>
+      <text id="lblI" class="tag-b" fill="var(--accent)" x="0" y="0">i</text>
+      <text id="lblR" class="tag-b" fill="var(--accent)" x="0" y="0">r</text>
+      <circle cx="300" cy="210" r="4" fill="var(--fg)"/>
+      <g id="handle" tabindex="0" role="slider" aria-label="Angle of incidence, drag or use arrow keys" aria-valuemin="0" aria-valuemax="89">
+        <circle r="24" fill="transparent"/>
+        <circle class="hring" r="11"/>
+        <circle r="3.5" fill="var(--ray)"/>
+      </g>
+      <text class="tag" x="586" y="408" text-anchor="end">drag the ray to change i</text>
+    </svg>
+  </div>
+
+  <div id="verdict" class="verdict" aria-live="polite"></div>
+
+  <div class="ctl">
+    <div class="box">
+      <div class="lab">Direction of travel</div>
+      <div class="seg" id="dirSeg">
+        <input type="radio" name="dir" id="dA" value="A" checked><label for="dA">Air into material</label>
+        <input type="radio" name="dir" id="dB" value="B"><label for="dB">Material into air</label>
+      </div>
+      <div class="lab" style="margin-top:14px">Material (μ from the usual textbook values)</div>
+      <div class="seg" id="matSeg">
+        <input type="radio" name="mat" id="mW" value="1.33" data-n="Water" checked><label for="mW">Water 1.33</label>
+        <input type="radio" name="mat" id="mG" value="1.5" data-n="Glass"><label for="mG">Glass 1.50</label>
+        <input type="radio" name="mat" id="mD" value="2.42" data-n="Diamond"><label for="mD">Diamond 2.42</label>
+      </div>
+    </div>
+    <div class="box">
+      <div class="lab">Type an angle, the other one is worked out</div>
+      <div class="pair">
+        <div class="fld"><label for="inI">i (degrees)</label><input type="number" id="inI" min="0" max="90" step="any" inputmode="decimal" value="40"></div>
+        <div class="fld"><label for="inR">r (degrees)</label><input type="number" id="inR" min="0" max="90" step="any" inputmode="decimal"></div>
+      </div>
+      <p class="hint" id="hint">Edit either box. The slider and diagram follow.</p>
+      <input type="range" id="ang" min="0" max="89" step="0.1" value="40" aria-label="Angle of incidence in degrees">
+      <div class="row"><button id="btnC" type="button">Jump to critical angle</button><button id="btn0" type="button">i = 0° (along normal)</button></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="stats">
+      <div class="stat"><div class="v" id="sI">–</div><div class="k">angle of incidence i</div></div>
+      <div class="stat"><div class="v" id="sR">–</div><div class="k">angle of refraction r</div></div>
+      <div class="stat"><div class="v" id="sMu">–</div><div class="k">μ = sin i ÷ sin r</div></div>
+      <div class="stat"><div class="v" id="sV">–</div><div class="k">speed in material (m/s), taking c = 3 × 10⁸</div></div>
+      <div class="stat"><div class="v" id="sC">–</div><div class="k">critical angle C, from μ = 1 ÷ sin C</div></div>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="lab">Try these</div>
+    <ol class="notice">
+      <li>Air into water, then raise i. Does the ray bend towards or away from the normal? Now try diamond.</li>
+      <li>Set i = 0°. The ray goes straight through. Why does it not bend?</li>
+      <li>Choose "Material into air" and press "Jump to critical angle". What is r at that moment?</li>
+      <li>Go past the critical angle. Where did the refracted ray go?</li>
+    </ol>
+    <p class="sub" style="margin-top:10px">When light changes medium, its speed and wavelength change. Its frequency does not.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var cx=300, cy=210, L=215, c=3e8;
+  var $=function(id){return document.getElementById(id)};
+  var ang=$('ang');
+  function rad(d){return d*Math.PI/180}
+  function deg(r){return r*180/Math.PI}
+  function pt(sx,sy){return (cx+sx).toFixed(1)+' '+(cy+sy).toFixed(1)}
+  function arcPath(R,theta,xs,ys){
+    var x1=cx, y1=cy+ys*R;
+    var x2=cx+xs*R*Math.sin(rad(theta)), y2=cy+ys*R*Math.cos(rad(theta));
+    var sweep=(xs*ys>0)?0:1;
+    return 'M'+x1+' '+y1+' A'+R+' '+R+' 0 0 '+sweep+' '+x2.toFixed(1)+' '+y2.toFixed(1);
+  }
+  function curMode(){return document.querySelector('input[name=dir]:checked').value}
+  function curMu(){return parseFloat(document.querySelector('input[name=mat]:checked').value)}
+  function fmt(x){return (Math.round(x*100)/100).toString()}
+  function update(src){
+    var mode=curMode();
+    var matEl=document.querySelector('input[name=mat]:checked');
+    var mu=parseFloat(matEl.value), name=matEl.dataset.n;
+    var i=parseFloat(ang.value);
+    var inI=$('inI'), inR=$('inR');
+    if(src!=='i') inI.value=fmt(i);
+    $('botName').textContent=name+'  (μ = '+mu.toFixed(2)+')';
+    $('topName').textContent='Air  (μ = 1.00)';
+    var n1=mode==='A'?1:mu, n2=mode==='A'?mu:1;
+    var inSide=mode==='A'?-1:1;     // y direction of incident side
+    var outSide=-inSide;
+    var s=n1*Math.sin(rad(i))/n2;
+    var tir=s>1;
+    var C=deg(Math.asin(1/mu));
+    var r=tir?null:deg(Math.asin(s));
+    var si=Math.sin(rad(i)), ci=Math.cos(rad(i));
+    // incident goes left->right: starts at left
+    $('inRay').setAttribute('d','M'+pt(-L*si,inSide*L*ci)+' L'+pt(0,0));
+    var h=$('handle');
+    h.setAttribute('transform','translate('+(cx-L*si).toFixed(1)+' '+(cy+inSide*L*ci).toFixed(1)+')');
+    h.setAttribute('aria-valuenow',fmt(i));
+    $('reflRay').setAttribute('d','M'+pt(0,0)+' L'+pt(L*si,inSide*L*ci));
+    $('reflRay').style.opacity=tir?1:0.28;
+    $('reflRay').setAttribute('class','ray refl'+(tir?'':' solid'));
+    var out=$('outRay');
+    if(tir){out.style.display='none';$('arcR').setAttribute('d','');$('lblR').textContent='';}
+    else{
+      out.style.display='';
+      var sr=Math.sin(rad(r)), cr=Math.cos(rad(r));
+      out.setAttribute('d','M'+pt(0,0)+' L'+pt(L*sr,outSide*L*cr));
+      $('arcR').setAttribute('d',arcPath(60,r,1,outSide));
+      var m=rad(r/2);$('lblR').setAttribute('x',cx+85*Math.sin(m)+4);$('lblR').setAttribute('y',cy+outSide*85*Math.cos(m)+(outSide>0?12:-2));
+      $('lblR').textContent='r';
+    }
+    $('arcI').setAttribute('d',i===0?'':arcPath(60,i,-1,inSide));
+    var mi=rad(i/2);$('lblI').setAttribute('x',cx-85*Math.sin(mi)-16);$('lblI').setAttribute('y',cy+inSide*85*Math.cos(mi)+(inSide>0?12:-2));
+    $('lblI').textContent=i===0?'':'i';
+    // stats
+    if(src!=='r') inR.value=tir?'':fmt(r);
+    if(src!=='r'&&tir){$('hint').textContent='No refracted ray, so r has no value. Total internal reflection.';$('hint').className='hint';}
+    else if(src!=='bad'){$('hint').textContent=mode==='A'?'Largest possible r here is the critical angle '+C.toFixed(1)+'°.':'In this direction, i can only go up to C = '+C.toFixed(1)+'° before TIR.';$('hint').className='hint';}
+    $('sI').textContent=fmt(i)+'°';
+    $('sR').textContent=tir?'none':r.toFixed(1)+'°';
+    $('sMu').textContent=(tir||i===0)?(i===0?'0 ÷ 0':'–'):(mode==='A'?(si/Math.sin(rad(r))):(Math.sin(rad(r))/si)).toFixed(2);
+    $('sV').textContent=(c/mu).toExponential(2).replace('e+','×10^').replace('^8','⁸');
+    $('sC').textContent=C.toFixed(1)+'°';
+    var v=$('verdict');
+    v.className='verdict'+(tir?' tir':'');
+    if(tir){
+      v.innerHTML='Total internal reflection<small>i is greater than C = '+C.toFixed(1)+'°, so no light leaves. The faint reflected ray becomes the whole beam.</small>';
+    }else if(i===0){
+      v.innerHTML='No bending<small>Along the normal, light changes speed but keeps its direction.</small>';
+    }else if(mode==='A'){
+      v.innerHTML='Bends towards the normal<small>Light slows down going from air into a denser medium, so r is smaller than i.</small>';
+    }else{
+      var atC=Math.abs(i-C)<0.15;
+      v.innerHTML=atC?'At the critical angle<small>r is 90°. The refracted ray skims along the boundary.</small>':'Bends away from the normal<small>Light speeds up going from a denser medium into air, so r is larger than i. TIR needs i greater than C = '+C.toFixed(1)+'°.</small>';
+    }
+  }
+  ang.addEventListener('input',function(){update()});
+  // Drag the ray (or anywhere on the diagram) to set i
+  var svg=$('svg'), dragging=false;
+  function setFromPointer(e){
+    var m=svg.getScreenCTM(); if(!m) return;
+    var p=new DOMPoint(e.clientX,e.clientY).matrixTransform(m.inverse());
+    var dx=Math.max(0,cx-p.x), dy=Math.abs(p.y-cy);
+    var a=Math.min(89,Math.max(0,deg(Math.atan2(dx,Math.max(dy,0.001)))));
+    ang.value=Math.round(a*10)/10; update();
+  }
+  svg.addEventListener('pointerdown',function(e){
+    dragging=true; svg.classList.add('drag');
+    try{svg.setPointerCapture(e.pointerId)}catch(_){}
+    setFromPointer(e); e.preventDefault();
+  });
+  svg.addEventListener('pointermove',function(e){if(dragging) setFromPointer(e)});
+  function endDrag(){dragging=false; svg.classList.remove('drag')}
+  svg.addEventListener('pointerup',endDrag);
+  svg.addEventListener('pointercancel',endDrag);
+  $('handle').addEventListener('keydown',function(e){
+    var step=e.shiftKey?5:0.5, v=parseFloat(ang.value), k=e.key;
+    if(k==='ArrowRight'||k==='ArrowUp') v+=step; else if(k==='ArrowLeft'||k==='ArrowDown') v-=step; else return;
+    ang.value=Math.min(89,Math.max(0,v)); update(); e.preventDefault();
+  });
+  $('inI').addEventListener('input',function(){
+    var v=parseFloat(this.value);
+    if(isNaN(v)||v<0||v>89.9){$('hint').textContent='Enter i between 0 and 89.9 degrees.';$('hint').className='hint bad';return}
+    ang.value=v;update('i');
+  });
+  $('inR').addEventListener('input',function(){
+    var v=parseFloat(this.value);
+    var mu=curMu(), mode=curMode(), C=deg(Math.asin(1/mu));
+    var maxR=mode==='A'?C:90;
+    if(isNaN(v)||v<0||v>maxR){
+      $('hint').textContent=mode==='A'?'In '+document.querySelector('input[name=mat]:checked').dataset.n+' r cannot be more than '+C.toFixed(1)+'°.':'Enter r between 0 and 90 degrees.';
+      $('hint').className='hint bad';return;
+    }
+    var sinI=mode==='A'?mu*Math.sin(rad(v)):Math.sin(rad(v))/mu;
+    ang.value=Math.min(89.9,deg(Math.asin(Math.min(1,sinI))));update('r');
+  });
+  $('btn0').addEventListener('click',function(){ang.value=0;update()});
+  ['dA','dB','mW','mG','mD'].forEach(function(id){$(id).addEventListener('change',function(){update()})});
+  $('btnC').addEventListener('click',function(){
+    document.getElementById('dB').checked=true;
+    var mu=parseFloat(document.querySelector('input[name=mat]:checked').value);
+    ang.value=Math.floor(deg(Math.asin(1/mu))*10)/10;update();
+  });
+  update();
+})();
+</script>
+
+</body>
+</html>

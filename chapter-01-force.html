@@ -1,0 +1,1028 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Force Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+[hidden]{display:none!important}
+body{margin:0}
+
+/* Layout: a notebook-style lab. Header, topic tabs in syllabus order, one graph-paper figure per topic with controls and live readouts beneath. */
+:root{
+  --bg:#f2f5f9; --panel:#ffffff; --fg:#14202e; --muted:#566779; --line:#d3dce6;
+  --cw:#c2410c; --acw:#0b7285; --vel:#2f7d32; --accent:#1d4ed8; --soft:#e8eef6;
+  --font-display:"Bricolage Grotesque","Trebuchet MS",sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1621; --panel:#162231; --fg:#e7eef6; --muted:#9db0c4; --line:#2a3b4e;
+  --cw:#ff9158; --acw:#4fd1e6; --vel:#74d680; --accent:#7aa2ff; --soft:#1d2d40; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1621; --panel:#162231; --fg:#e7eef6; --muted:#9db0c4; --line:#2a3b4e;
+  --cw:#ff9158; --acw:#4fd1e6; --vel:#74d680; --accent:#7aa2ff; --soft:#1d2d40; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:15px;line-height:1.5;
+  padding-block:20px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--font-display);font-size:clamp(26px,5vw,36px);line-height:1.1;margin:0;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:62ch}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs button{font:600 14px var(--font-body);color:var(--fg);background:var(--panel);border:1px solid var(--line);
+  padding:9px 12px;border-radius:8px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.idea{display:flex;flex-direction:column;gap:6px}
+.idea h2{font-family:var(--font-display);font-size:20px;margin:0;text-wrap:balance}
+.idea p{margin:0;max-width:68ch}
+h3{font-family:var(--font-display);font-size:16px;margin:4px 0 0}
+.key{font-family:var(--font-mono);background:var(--soft);padding:2px 7px;border-radius:5px}
+figure{margin:0;display:flex;flex-direction:column;gap:6px;min-width:0}
+.paper{border:1px solid var(--line);border-radius:10px;overflow-x:auto;
+  background-color:var(--panel);
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:20px 20px;background-position:-1px -1px}
+.paper svg{display:block;width:100%;min-width:520px;height:auto}
+figcaption{color:var(--muted);font-size:13px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px 18px}
+.ctl{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ctl label,.ctl .lab{display:flex;justify-content:space-between;gap:8px;font-weight:500}
+.ctl output{font-family:var(--font-mono)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+select,input[type=number]{font:500 14px var(--font-body);color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font:600 14px var(--font-body);color:var(--fg);background:var(--soft);border:1px solid var(--line);padding:8px 12px;border-radius:8px;cursor:pointer}
+.btn[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.box{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.box .t{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.box .v{font-family:var(--font-mono);font-size:15px;overflow-wrap:anywhere}
+.acw{color:var(--acw)} .cw{color:var(--cw)}
+.status{font-weight:600;padding:10px 12px;border-radius:10px;background:var(--soft)}
+.meter{position:relative;height:14px;border-radius:7px;background:var(--soft);border:1px solid var(--line)}
+.meter i{position:absolute;inset:0 auto 0 0;border-radius:7px;background:var(--cw);transition:width .2s}
+.meter b{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--fg)}
+details{border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
+summary{cursor:pointer;font-weight:600}
+details p{margin:8px 0 0}
+.note{font-size:13px;color:var(--muted);margin:0}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:var(--soft);font-weight:600}
+td.n{font-family:var(--font-mono);text-align:right;white-space:nowrap}
+.q{font-size:17px;max-width:62ch;margin:0}
+.ansrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ansrow input{width:140px}
+.work{font-family:var(--font-mono);font-size:13px;background:var(--soft);border-radius:8px;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.grab{cursor:grab;touch-action:none}
+.grab:active{cursor:grabbing}
+/* svg */
+svg text{font-family:var(--font-body);font-size:13px;fill:var(--fg);pointer-events:none}
+#vel,#cen,#fug,#string,#orbit,#ptilt,#arrow,#bfa,#wfa,#lA,#rA,#nA,#wA{pointer-events:none}
+svg .m{font-family:var(--font-mono);font-size:12px}
+svg .mut{fill:var(--muted)}
+.ink{stroke:var(--fg);fill:none;stroke-width:2}
+.solid{fill:var(--soft);stroke:var(--fg);stroke-width:2}
+.ghost{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:5 4}
+.gdot{fill:var(--cw);stroke:var(--panel);stroke-width:2}
+.dash{stroke:var(--muted);stroke-width:1.5;stroke-dasharray:5 4;fill:none}
+#door{transition:transform .6s cubic-bezier(.3,.7,.3,1)}
+@media (prefers-reduced-motion: reduce){#door,.meter i{transition:none}}
+</style>
+
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="mCW" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M0,1 L13,7 L0,13z" style="fill:var(--cw)"/></marker>
+    <marker id="mACW" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M0,1 L13,7 L0,13z" style="fill:var(--acw)"/></marker>
+    <marker id="mVel" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M0,1 L13,7 L0,13z" style="fill:var(--vel)"/></marker>
+    <marker id="mGrey" markerUnits="userSpaceOnUse" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto"><path d="M0,1 L13,7 L0,13z" style="fill:var(--muted)"/></marker>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <header>
+    <h1>Force Lab</h1>
+    <p class="sub">ICSE Class 10 Physics, Chapter 1: Force. One tab for each syllabus topic. Move the sliders and watch what changes. All values use SI units unless a cgs unit is asked for.</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Chapter 1 topics">
+    <button role="tab" data-tab="motion" aria-selected="true">1. Two kinds of motion</button>
+    <button role="tab" data-tab="moment" aria-selected="false">2. Moment of a force</button>
+    <button role="tab" data-tab="equilibrium" aria-selected="false">3. Equilibrium</button>
+    <button role="tab" data-tab="principle" aria-selected="false">4. Principle of moments</button>
+    <button role="tab" data-tab="gravity" aria-selected="false">5. Centre of gravity</button>
+    <button role="tab" data-tab="circular" aria-selected="false">6. Circular motion</button>
+    <button role="tab" data-tab="numericals" aria-selected="false">7. Numericals</button>
+  </div>
+
+  <!-- TAB 1: translational vs rotational -->
+  <section class="card" id="p-motion" role="tabpanel">
+    <div class="idea">
+      <h2>The same push can move a body or turn it</h2>
+      <p>A force on a rigid body that is free to move makes it travel in a straight line. This is <b>translational motion</b>. A force on a body that is fixed at a pivot makes it turn about that point. This is <b>rotational motion</b>.</p>
+    </div>
+    <figure>
+      <div class="paper">
+        <svg id="svgMotion" viewBox="0 0 640 260" role="img" aria-label="Left: a ball on the floor pushed by a force moves in a straight line. Right: a wheel fixed on an axle pushed on its rim turns about the axle.">
+          <text x="30" y="30" style="font-weight:600">Free ball: translational</text>
+          <text x="360" y="30" style="font-weight:600">Wheel on an axle: rotational</text>
+          <line x1="30" y1="200" x2="320" y2="200" class="ink"/>
+          <circle id="ball" cx="90" cy="178" r="22" class="solid grab"/>
+          <line id="bfa" x1="20" y1="178" x2="64" y2="178" stroke-width="4" marker-end="url(#mCW)" style="stroke:var(--cw);display:none"/>
+          <text id="bfl" x="20" y="165" class="m" style="display:none">F</text>
+          <g id="wheel">
+            <circle id="wcirc" cx="480" cy="130" r="70" class="solid grab"/>
+            <line x1="410" y1="130" x2="550" y2="130" class="ink" style="pointer-events:none"/>
+            <line x1="480" y1="60" x2="480" y2="200" class="ink" style="pointer-events:none"/>
+            <circle cx="550" cy="130" r="5" style="fill:var(--acw);pointer-events:none"/>
+          </g>
+          <line id="wfa" x1="560" y1="78" x2="560" y2="122" stroke-width="4" marker-end="url(#mCW)" style="stroke:var(--cw);display:none"/>
+          <text id="wfl" x="572" y="100" class="m" style="display:none">F</text>
+          <circle cx="480" cy="130" r="8" style="fill:var(--fg)"/>
+          <text x="480" y="232" text-anchor="middle" class="mut">axle (fixed point)</text>
+        </svg>
+      </div>
+      <figcaption>The force on the wheel acts along the tangent at its rim, so it produces a turning effect about the axle. The blue dot marks one point on the rim so you can see the turn.</figcaption>
+      <p class="note"><b>Drag to explore:</b> grab the ball and throw it along the floor. Grab the wheel by its rim and spin it. Or hold the button to push both with the same force. There is a little friction, so both slow down slowly.</p>
+    </figure>
+    <div class="controls">
+      <div class="ctl"><label for="fm">Force <output id="fmo"></output></label><input id="fm" type="range" min="1" max="10" step="1" value="5"></div>
+      <div class="ctl"><span class="lab">Run</span><div class="row"><button class="btn" id="mgo">Hold to push</button><button class="btn" id="mrst">Reset</button></div></div>
+    </div>
+    <div class="read">
+      <div class="box"><span class="t">Ball (free to move)</span><span class="v" id="mb">at rest</span></div>
+      <div class="box"><span class="t">Wheel (fixed axle)</span><span class="v" id="mw">at rest</span></div>
+    </div>
+    <div class="status">Free to move: translational (straight path). Fixed at a pivot: rotational (turns about the pivot).</div>
+    <details><summary>Try it yourself</summary>
+      <p>Name one everyday object that shows translational motion and one that shows rotational motion. (Examples: a pushed trolley moves in a straight line; a ceiling fan or a door on its hinges turns about a fixed line.)</p></details>
+  </section>
+
+  <!-- TAB 2: moment -->
+  <section class="card" id="p-moment" role="tabpanel" hidden>
+    <div class="idea">
+      <h2>A force turns a body better the farther it is from the pivot</h2>
+      <p>The turning effect of a force is called its <b>moment</b>, also called <b>torque</b>. <span class="key">moment = force × perpendicular distance from the pivot</span>. The SI unit is newton metre (N m). The cgs unit is dyne cm.</p>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label for="ex1">Everyday example</label>
+        <select id="ex1"><option value="door">Door</option><option value="spanner">Spanner and nut</option><option value="pedal">Bicycle pedal</option><option value="wheel">Steering wheel</option></select></div>
+    </div>
+    <figure>
+      <div class="paper">
+        <svg id="svgMoment" viewBox="0 0 640 300" role="img" aria-label="A bar pivoted at the left. A force pushes on the bar at an adjustable distance from the pivot. A larger force or a larger distance gives a larger moment.">
+          <text x="70" y="30" class="mut" id="topl">Top view of a door</text>
+          <rect x="70" y="144" width="500" height="12" class="ghost"/>
+          <g id="door" style="transform-origin:70px 150px"><rect x="70" y="144" width="500" height="12" class="solid"/></g>
+          <line id="rdim" x1="70" y1="180" x2="270" y2="180" style="stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3"/>
+          <line id="rt1" x1="70" y1="172" x2="70" y2="188" style="stroke:var(--muted);stroke-width:1.5"/>
+          <line id="rt2" x1="270" y1="172" x2="270" y2="188" style="stroke:var(--muted);stroke-width:1.5"/>
+          <text id="rlab" x="170" y="202" text-anchor="middle" class="m">r = 0.40 m</text>
+          <line id="arrow" x1="270" y1="80" x2="270" y2="142" stroke-width="4" marker-end="url(#mCW)" style="stroke:var(--cw)"/>
+          <text id="flab" x="282" y="100" class="m">F = 10 N</text>
+          <circle id="fh" cx="270" cy="80" r="10" class="grab" style="fill:var(--panel);stroke:var(--cw);stroke-width:3"/>
+          <circle cx="70" cy="150" r="9" class="solid"/>
+          <text id="pivl" x="70" y="124" text-anchor="middle">hinge</text>
+          <text x="70" y="270" class="mut">The force is applied at right angles to the bar, so r is measured along the bar.</text>
+        </svg>
+      </div>
+      <figcaption>The faint dashed outline is the starting position. The bar turns only when the moment beats the resistance at the pivot (example values).</figcaption>
+      <p class="note"><b>Drag to explore:</b> drag the round handle at the back of the arrow. Left and right changes the distance r. Up and down changes the force F. Drag it across the bar to push from the other side.</p>
+    </figure>
+    <div class="controls">
+      <div class="ctl"><label for="f1">Force F <output id="f1o"></output></label><input id="f1" type="range" min="1" max="50" step="1" value="10"></div>
+      <div class="ctl"><label for="r1">Distance from pivot r <output id="r1o"></output></label><input id="r1" type="range" min="0" max="100" step="1" value="40"></div>
+      <div class="ctl"><span class="lab">Push direction</span>
+        <div class="row">
+          <button class="btn" id="dirCW" aria-pressed="true">Clockwise push</button>
+          <button class="btn" id="dirACW" aria-pressed="false">Anticlockwise push</button>
+        </div></div>
+    </div>
+    <div class="read">
+      <div class="box"><span class="t">Moment (SI)</span><span class="v" id="m1"></span></div>
+      <div class="box"><span class="t">Moment (cgs)</span><span class="v" id="mc1"></span></div>
+      <div class="box"><span class="t">Turning direction</span><span class="v" id="dd1"></span></div>
+      <div class="box"><span class="t">Needed to turn (example)</span><span class="v" id="needv"></span></div>
+    </div>
+    <div class="meter" aria-hidden="true"><i id="mf"></i><b style="left:50%"></b></div>
+    <div class="status" id="s1" aria-live="polite"></div>
+    <p class="note">Sign convention: an anticlockwise moment is taken positive and a clockwise moment negative. 1 N m = 10⁷ dyne cm, because 1 N = 10⁵ dyne and 1 m = 100 cm.</p>
+    <details><summary>Try it yourself</summary>
+      <p>Pick the door, set F = 10 N and r = 40 cm, then raise r to 100 cm. Now set r = 0. Why can no force open a door by pushing at the hinge? (Answer: the moment is F × 0 = 0, so there is no turning effect.) Why is a spanner made with a long handle? (A longer r gives the same moment with a smaller force.)</p></details>
+  </section>
+
+  <!-- TAB 3: equilibrium -->
+  <section class="card" id="p-equilibrium" role="tabpanel" hidden>
+    <div class="idea">
+      <h2>Two conditions for a body to be in equilibrium</h2>
+      <p>A body is in equilibrium when the forces on it produce no change in its motion. Two things must hold: <b>(1)</b> the resultant force is zero (translational condition), and <b>(2)</b> the sum of anticlockwise moments equals the sum of clockwise moments about the pivot (rotational condition). Tab 4 tests the second condition. This tab tests the first.</p>
+    </div>
+    <figure>
+      <div class="paper">
+        <svg id="svgEq" viewBox="0 0 640 250" role="img" aria-label="A block on a smooth table pulled left and right by two horizontal forces. Equal forces leave it at rest or moving at constant velocity. Unequal forces make it speed up.">
+          <line x1="20" y1="170" x2="620" y2="170" class="ink"/>
+          <rect id="blk" x="270" y="110" width="100" height="60" class="solid grab"/>
+          <line id="nA" x1="320" y1="108" x2="320" y2="62" stroke-width="3" marker-end="url(#mVel)" style="stroke:var(--vel)"/>
+          <text id="nT" x="330" y="76" class="m" style="fill:var(--vel)">N</text>
+          <line id="wA" x1="320" y1="172" x2="320" y2="216" stroke-width="3" marker-end="url(#mVel)" style="stroke:var(--vel)"/>
+          <text id="wT" x="330" y="212" class="m" style="fill:var(--vel)">W</text>
+          <line id="lA" stroke-width="4" marker-end="url(#mACW)" style="stroke:var(--acw)"/>
+          <text id="lT" class="m" style="fill:var(--acw)"></text>
+          <line id="rA" stroke-width="4" marker-end="url(#mCW)" style="stroke:var(--cw)"/>
+          <text id="rT" class="m" style="fill:var(--cw)"></text>
+          <circle id="lh" r="9" cy="140" class="grab" style="fill:var(--panel);stroke:var(--acw);stroke-width:3"/>
+          <circle id="rh" r="9" cy="140" class="grab" style="fill:var(--panel);stroke:var(--cw);stroke-width:3"/>
+        </svg>
+      </div>
+      <figcaption>N is the table's upward reaction and W is the weight. They are equal, so the block never moves up or down. The table is smooth (no friction) and the block has a mass of 2 kg.</figcaption>
+      <p class="note"><b>Drag to explore:</b> drag the round handle at the end of either force arrow to change that pull. Drag the block itself and let go to throw it: with equal pulls it keeps moving at the speed you gave it.</p>
+    </figure>
+    <div class="controls">
+      <div class="ctl"><label for="fl">Pull to the left <output id="flo"></output></label><input id="fl" type="range" min="0" max="10" step="1" value="4"></div>
+      <div class="ctl"><label for="fr">Pull to the right <output id="fro"></output></label><input id="fr" type="range" min="0" max="10" step="1" value="4"></div>
+      <div class="ctl"><span class="lab">Starting state</span>
+        <div class="row"><button class="btn" id="eqRest" aria-pressed="true">At rest</button><button class="btn" id="eqMove" aria-pressed="false">Moving right at 2 m/s</button></div></div>
+    </div>
+    <div class="row"><button class="btn" id="epp">Pause</button><button class="btn" id="erst">Reset</button></div>
+    <div class="read">
+      <div class="box"><span class="t">Resultant force</span><span class="v" id="e1"></span></div>
+      <div class="box"><span class="t">Velocity</span><span class="v" id="e2"></span></div>
+      <div class="box"><span class="t">Kind of equilibrium</span><span class="v" id="e3"></span></div>
+    </div>
+    <div class="status" id="s4" aria-live="polite"></div>
+    <h3>Static and dynamic equilibrium</h3>
+    <div class="tw"><table>
+      <tr><th>Kind</th><th>What the body is doing</th><th>Examples</th></tr>
+      <tr><td><b>Static</b></td><td>Stays at rest</td><td>A book on a table. A beam balance with its beam horizontal. A tug of war with neither team moving.</td></tr>
+      <tr><td><b>Dynamic</b></td><td>Keeps the same motion (straight line at constant speed, or constant speed in a circle)</td><td>A raindrop falling at constant speed. An aeroplane flying level at constant speed. A stone whirled in a circle at constant speed. A planet going round the Sun.</td></tr>
+    </table></div>
+    <details><summary>Try it yourself</summary>
+      <p>Set both pulls to 4 N and choose "Moving right". Does the block stop? (Answer: no. With zero resultant force it keeps moving at the same velocity, which is dynamic equilibrium.) Now set the right pull to 6 N. What changes? (The resultant is 2 N to the right, so it speeds up and is no longer in equilibrium.)</p></details>
+  </section>
+
+  <!-- TAB 4: principle of moments -->
+  <section class="card" id="p-principle" role="tabpanel" hidden>
+    <div class="idea">
+      <h2>A rule balances when the two turning effects are equal</h2>
+      <p>A uniform metre rule is hung from a thread at its 50 cm mark. A weight on the left turns it anticlockwise, a weight on the right turns it clockwise. <span class="key">anticlockwise moments = clockwise moments</span> is the <b>principle of moments</b>. A beam balance works on this principle.</p>
+    </div>
+    <figure>
+      <div class="paper">
+        <svg id="svgRule" viewBox="0 0 680 340" role="img" aria-label="A metre rule balanced on a pivot at its centre with a weight on each side. The rule tilts toward the side with the larger moment and sits level when the moments are equal.">
+          <g id="rule">
+            <rect x="40" y="163" width="600" height="14" class="solid"/>
+            <g id="ticks"></g>
+          </g>
+          <polygon points="340,177 316,222 364,222" class="solid"/>
+          <circle cx="340" cy="170" r="4" style="fill:var(--fg)"/>
+          <text x="340" y="242" text-anchor="middle">pivot at 50 cm</text>
+          <g id="wts"></g>
+        </svg>
+      </div>
+      <figcaption>The rule's own weight acts at its 50 cm mark, which is the pivot, so it adds no moment. In the school experiment each weight hangs from a spring balance clipped to the rule, and the spring balance reads the weight.</figcaption>
+      <p class="note"><b>Drag to explore:</b> drag either weight sideways along the rule to change its distance. Use the sliders to change the size of the weights. Watch which side drops.</p>
+    </figure>
+    <div class="controls">
+      <div class="ctl"><label for="w1">Left weight W₁ <output id="w1o"></output></label><input id="w1" type="range" min="1" max="20" step="0.5" value="6"></div>
+      <div class="ctl"><label for="d1">Left distance d₁ <output id="d1o"></output></label><input id="d1" type="range" min="5" max="50" step="0.5" value="30"></div>
+      <div class="ctl"><label for="w2">Right weight W₂ <output id="w2o"></output></label><input id="w2" type="range" min="1" max="20" step="0.5" value="4"></div>
+      <div class="ctl"><label for="d2">Right distance d₂ <output id="d2o"></output></label><input id="d2" type="range" min="5" max="50" step="0.5" value="40"></div>
+    </div>
+    <div class="row"><button class="btn" id="bal">Balance it (adjust d₂)</button><button class="btn" id="rec">Record this reading</button><button class="btn" id="recx">Clear table</button></div>
+    <div class="read">
+      <div class="box"><span class="t">Anticlockwise (left)</span><span class="v acw" id="acw"></span></div>
+      <div class="box"><span class="t">Clockwise (right)</span><span class="v cw" id="cwm"></span></div>
+      <div class="box"><span class="t">Forces: pivot push up</span><span class="v" id="rea"></span></div>
+    </div>
+    <div class="status" id="s2" aria-live="polite"></div>
+    <h3>Verification table</h3>
+    <p class="note">Balance the rule, then record a reading. When it is level, W₁ × d₁ equals W₂ × d₂ in every row. This is how the experiment verifies the principle.</p>
+    <div class="tw"><table>
+      <thead><tr><th>#</th><th>W₁ (N)</th><th>d₁ (cm)</th><th>W₁ × d₁ (N cm)</th><th>W₂ (N)</th><th>d₂ (cm)</th><th>W₂ × d₂ (N cm)</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="7" class="note">No readings yet.</td></tr></tbody>
+    </table></div>
+    <details><summary>Try it yourself</summary>
+      <p>Put W₁ = 6 N at 30 cm. Where must a 9 N weight go on the right to balance it? Check with the sliders. (Answer: 6 × 30 = 9 × d₂, so d₂ = 20 cm.)</p></details>
+  </section>
+
+  <!-- TAB 5: centre of gravity -->
+  <section class="card" id="p-gravity" role="tabpanel" hidden>
+    <div class="idea">
+      <h2>All the weight acts as if it were at one point</h2>
+      <p>Gravity pulls on every particle of a body. These many parallel pulls can be replaced by one force, the weight, acting at a single point called the <b>centre of gravity (C.G.)</b>. About this point the moments of the weights of all the particles add up to zero. Its position depends on the shape and on how the mass is spread out. The syllabus asks for this idea qualitatively only.</p>
+    </div>
+    <h3>Regular bodies</h3>
+    <div class="row" id="shapeBtns" role="group" aria-label="Choose a shape"></div>
+    <figure>
+      <div class="paper">
+        <svg viewBox="0 0 640 250" role="img" aria-label="A regular body with its centre of gravity marked.">
+          <g id="shape"></g>
+          <text id="gnote" x="320" y="240" text-anchor="middle"></text>
+        </svg>
+      </div>
+      <figcaption>The red dot is the centre of gravity G. It need not lie inside the material: for a ring it is at the centre, in empty space.</figcaption>
+    </figure>
+
+    <h3>Finding the C.G. of an irregular lamina with a plumb line</h3>
+    <p class="note" style="max-width:68ch">Make three small holes near the edge of the cardboard. Hang it from one hole and let it settle. Hang a plumb line from the same pin and mark where the string lies. The C.G. is always directly below the point of suspension, so it lies on that line. Repeat with another hole. The lines cross at G.</p>
+    <figure>
+      <div class="paper">
+        <svg id="svgLam" viewBox="0 0 640 340" role="img" aria-label="An irregular cardboard lamina hung from one of three holes with a plumb line. The marked lines from different holes cross at the centre of gravity.">
+          <line x1="260" y1="30" x2="380" y2="30" class="ink"/>
+          <g id="lam">
+            <polygon id="lamPoly" class="solid" style="fill:var(--soft)"/>
+            <g id="chalk"></g>
+            <g id="holes"></g>
+            <circle id="lamG" r="6" class="gdot" style="display:none"/>
+            <text id="lamGt" class="m" style="display:none">G</text>
+          </g>
+          <line id="plumb" x1="320" y1="30" x2="320" y2="300" stroke-width="2" style="stroke:var(--fg)"/>
+          <circle id="bob" cx="320" cy="302" r="6" style="fill:var(--fg)"/>
+          <circle cx="320" cy="30" r="4" style="fill:var(--fg)"/>
+        </svg>
+      </div>
+      <figcaption>The solid line is the plumb line. The coloured lines are drawn on the cardboard along the plumb line for each hole.</figcaption>
+      <p class="note"><b>Drag to explore:</b> click a hole on the cardboard to hang it from there. Then grab the cardboard, swing it away and let go. It always swings back until G is straight below the pin.</p>
+    </figure>
+    <div class="row">
+      <button class="btn" id="hA">Hang from hole A</button>
+      <button class="btn" id="hB">Hang from hole B</button>
+      <button class="btn" id="hC">Hang from hole C</button>
+      <button class="btn" id="hX">Clear lines</button>
+    </div>
+    <div class="status" id="s5" aria-live="polite">Choose a hole to hang the lamina from.</div>
+
+    <h3>Balance it on a pencil tip</h3>
+    <p class="note" style="max-width:68ch">The cardboard lies flat. Drag the blue pencil tip under it and find the one point where it balances. The arrow shows which way the cardboard tips.</p>
+    <figure>
+      <div class="paper">
+        <svg id="svgPencil" viewBox="0 0 640 260" role="img" aria-label="A flat irregular cardboard lamina and a pencil tip you can drag under it. The lamina balances only when the tip is under its centre of gravity.">
+          <polygon id="pPoly" class="solid"/>
+          <line id="ptilt" stroke-width="4" marker-end="url(#mGrey)" style="stroke:var(--muted);display:none"/>
+          <circle id="pG" r="6" class="gdot" style="display:none"/>
+          <circle id="tip" r="9" class="grab" style="fill:var(--accent);stroke:var(--panel);stroke-width:2"/>
+        </svg>
+      </div>
+    </figure>
+    <div class="row"><button class="btn" id="pShow">Show where G is</button><button class="btn" id="pRst">Reset tip</button></div>
+    <div class="status" id="s5c" aria-live="polite"></div>
+
+    <h3>Balance point</h3>
+    <figure>
+      <div class="paper">
+        <svg id="svgBal" viewBox="0 0 640 170" role="img" aria-label="A uniform metre rule resting on a support that you can slide. It stays level only when the support is under the 50 cm mark.">
+          <g id="brule">
+            <rect x="40" y="80" width="600" height="14" class="solid"/>
+            <circle cx="340" cy="87" r="6" class="gdot"/>
+            <text x="340" y="70" text-anchor="middle" class="m">G at 50 cm</text>
+          </g>
+          <polygon id="bsup" class="solid grab"/>
+        </svg>
+      </div>
+    </figure>
+    <div class="controls">
+      <p class="note"><b>Drag to explore:</b> drag the grey support along the rule, or use the slider.</p>
+    <div class="ctl"><label for="bp">Support position <output id="bpo"></output></label><input id="bp" type="range" min="20" max="80" step="1" value="35"></div>
+    </div>
+    <div class="status" id="s5b" aria-live="polite"></div>
+    <details><summary>Try it yourself</summary>
+      <p>Why does a metre rule balance on a finger only at the 50 cm mark? (Answer: its C.G. is at the middle. Under any other point the weight, acting at the C.G., has a moment about the support and tips the rule.)</p></details>
+  </section>
+
+  <!-- TAB 6: circular motion -->
+  <section class="card" id="p-circular" role="tabpanel" hidden>
+    <div class="idea">
+      <h2>Constant speed, yet always accelerating</h2>
+      <p>A body moving in a circle at constant speed keeps changing direction, so its velocity keeps changing. A force toward the centre must act on it all the time: the <b>centripetal force</b>. This is a standard example of motion where the speed is constant although a force and an acceleration are present.</p>
+    </div>
+    <div class="controls">
+      <div class="ctl"><label for="ex3">Example</label>
+        <select id="ex3">
+          <option value="string">Stone whirled on a string</option>
+          <option value="moon">Moon around the Earth</option>
+          <option value="planet">Planet around the Sun</option>
+          <option value="electron">Electron around the nucleus</option>
+        </select></div>
+    </div>
+    <figure>
+      <div class="paper">
+        <svg id="svgCirc" viewBox="0 0 640 340" role="img" aria-label="Top view of a body moving anticlockwise in a circle. The velocity arrow points along the tangent and the centripetal force arrow points to the centre. Removing the force sends the body off in a straight line.">
+          <text x="600" y="28" text-anchor="middle" class="mut">N</text>
+          <line x1="600" y1="64" x2="600" y2="36" stroke-width="2" style="stroke:var(--muted)" marker-end="url(#mGrey)"/>
+          <circle id="orbit" cx="320" cy="170" r="110" class="ghost"/>
+          <line id="string" x1="320" y1="170" x2="430" y2="170" style="stroke:var(--fg);stroke-width:2"/>
+          <circle id="cdot" cx="320" cy="170" r="6" style="fill:var(--fg)"/>
+          <text id="clab" x="320" y="150" text-anchor="middle" class="mut"></text>
+          <line id="vel" stroke-width="4" style="stroke:var(--vel)" marker-end="url(#mVel)"/>
+          <line id="cen" stroke-width="4" style="stroke:var(--cw)" marker-end="url(#mCW)"/>
+          <line id="fug" stroke-width="3" stroke-dasharray="6 4" style="stroke:var(--muted)" marker-end="url(#mGrey)"/>
+          <circle id="stone" r="12" class="solid grab"/>
+          <text id="tvel" class="m" style="fill:var(--vel)">v</text>
+          <text id="tcen" class="m" style="fill:var(--cw)">F</text>
+          <text id="tfug" class="m mut"></text>
+        </svg>
+      </div>
+      <figcaption>Look from above. The body moves anticlockwise. The velocity arrow always touches the circle (a tangent). The centripetal arrow always points at the centre.</figcaption>
+      <p class="note"><b>Drag to explore:</b> grab the stone and drag it around the circle, or toward and away from the centre to change the radius. Let go and it carries on moving.</p>
+    </figure>
+    <div class="controls">
+      <div class="ctl"><label for="sp">Speed <output id="spo"></output></label><input id="sp" type="range" min="60" max="300" step="10" value="140"></div>
+      <div class="ctl"><label for="rad">Radius <output id="rado"></output></label><input id="rad" type="range" min="60" max="140" step="5" value="110"></div>
+      <div class="ctl"><span class="lab">Show</span>
+        <div class="row">
+          <button class="btn" id="tv" aria-pressed="true">Velocity</button>
+          <button class="btn" id="tc" aria-pressed="true">Centripetal force</button>
+          <button class="btn" id="tf" aria-pressed="false">Centrifugal force</button>
+        </div></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="pp">Pause</button>
+      <button class="btn" id="cut">Cut the string</button>
+      <button class="btn" id="rst">Reset</button>
+    </div>
+    <div class="read">
+      <div class="box"><span class="t">Provided by</span><span class="v" id="r0s"></span></div>
+      <div class="box"><span class="t">Speed</span><span class="v" id="r1s"></span></div>
+      <div class="box"><span class="t">Direction of motion</span><span class="v" id="r2s"></span></div>
+      <div class="box"><span class="t">Accelerated?</span><span class="v" id="r3s"></span></div>
+    </div>
+    <div class="status" id="s3" aria-live="polite"></div>
+    <h3>Centripetal and centrifugal force</h3>
+    <div class="tw"><table>
+      <tr><th></th><th>Centripetal force</th><th>Centrifugal force</th></tr>
+      <tr><td>Direction</td><td>Toward the centre</td><td>Away from the centre</td></tr>
+      <tr><td>Real or imagined</td><td>A real force that acts on the body</td><td>Not a real force. It is imagined by an observer who moves along with the body</td></tr>
+      <tr><td>Size</td><td>Needed to keep the body on the circle</td><td>Equal in size to the centripetal force</td></tr>
+      <tr><td>Reaction?</td><td>Has its own reaction force</td><td>Not the reaction of the centripetal force, because action and reaction act on different bodies</td></tr>
+    </table></div>
+    <details><summary>Try it yourself</summary>
+      <p>Cut the string at different points, resetting between tries. Which way does the stone fly each time? (Answer: along the tangent, the direction it was moving at that instant, because there is no longer a force toward the centre.)</p></details>
+  </section>
+
+  <!-- TAB 7: numericals -->
+  <section class="card" id="p-numericals" role="tabpanel" hidden>
+    <div class="idea">
+      <h2>Simple numericals</h2>
+      <p>Write the formula, substitute with units, then give the answer with its unit. Try the problem first, then check. The working appears after your first attempt. Use g only if the question needs it; in moment problems it cancels.</p>
+    </div>
+    <div class="read">
+      <div class="box"><span class="t">Correct</span><span class="v" id="nscore">0 of 0</span></div>
+    </div>
+    <p class="q" id="nq"></p>
+    <div class="ansrow">
+      <input id="nans" type="number" step="any" inputmode="decimal" aria-label="Your answer">
+      <span id="nunit"></span>
+      <button class="btn" id="nchk">Check</button>
+      <button class="btn" id="nshow" disabled>Show working</button>
+      <button class="btn" id="nnew">New problem</button>
+    </div>
+    <div class="status" id="nfb" aria-live="polite"></div>
+    <div class="work" id="nwork" hidden></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var NS="http://www.w3.org/2000/svg";
+  var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
+  function mk(tag,attrs,txt){var e=document.createElementNS(NS,tag);for(var a in attrs)e.setAttribute(a,attrs[a]);if(txt!=null)e.textContent=txt;return e}
+  function line(id,x1,y1,x2,y2,vis){var e=$(id);e.setAttribute("x1",x1);e.setAttribute("y1",y1);e.setAttribute("x2",x2);e.setAttribute("y2",y2);e.style.display=vis?"":"none"}
+  function tx(id,x,y,s,vis){var e=$(id);e.setAttribute("x",x);e.setAttribute("y",y);if(s!=null)e.textContent=s;e.style.display=vis===false?"none":""}
+  function svgPt(svg,e){var p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;var m=svg.getScreenCTM();return m?p.matrixTransform(m.inverse()):{x:0,y:0}}
+  function drag(svg,sel,h){
+    var active=false,tgt=null;
+    svg.addEventListener("pointerdown",function(e){
+      var t=e.target.closest?e.target.closest(sel):null;if(!t||!svg.contains(t))return;
+      active=true;tgt=t;try{svg.setPointerCapture(e.pointerId)}catch(x){}
+      e.preventDefault();if(h.start)h.start(svgPt(svg,e),e,t);
+    });
+    svg.addEventListener("pointermove",function(e){if(active&&h.move)h.move(svgPt(svg,e),e,tgt)});
+    function up(e){if(!active)return;active=false;if(h.end)h.end(svgPt(svg,e),e,tgt)}
+    svg.addEventListener("pointerup",up);svg.addEventListener("pointercancel",up);
+  }
+  function normA(d){while(d>180)d-=360;while(d<-180)d+=360;return d}
+
+  /* ---- tabs and one shared animation loop ---- */
+  var tabs=[].slice.call(document.querySelectorAll("[role=tab]"));
+  var ids=["motion","moment","equilibrium","principle","gravity","circular","numericals"];
+  var cur="motion",lastT=0;
+  function show(id){
+    cur=id;lastT=0;
+    tabs.forEach(function(t){t.setAttribute("aria-selected",String(t.dataset.tab===id))});
+    ids.forEach(function(k){$("p-"+k).hidden=(k!==id)});
+  }
+  tabs.forEach(function(t){t.addEventListener("click",function(){show(t.dataset.tab)})});
+  function tick(t){
+    var dt=lastT?Math.min(0.05,(t-lastT)/1000):0;lastT=t;
+    if(cur==="motion")stepMotion(dt);
+    else if(cur==="equilibrium")stepEq(dt);
+    else if(cur==="principle")stepRule();
+    else if(cur==="gravity")stepLamina(dt);
+    else if(cur==="circular")stepCirc(dt);
+    requestAnimationFrame(tick);
+  }
+
+  /* ---- 1: translational vs rotational ---- */
+  var bx=90,bv=0,wa=0,wv=0,pushing=false,mdrag=null;
+  function drawMotion(){
+    var F=+$("fm").value;
+    $("fmo").textContent=F+" N";
+    $("ball").setAttribute("cx",bx);
+    var fa=$("bfa");fa.style.display=pushing?"":"none";fa.setAttribute("x1",bx-72);fa.setAttribute("x2",bx-26);
+    tx("bfl",bx-72,165,"F",pushing);
+    $("wheel").setAttribute("transform","rotate("+wa+" 480 130)");
+    $("wfa").style.display=pushing?"":"none";$("wfl").style.display=pushing?"":"none";
+    $("mb").textContent=Math.abs(bv)>4?"moving in a straight line":"at rest";
+    $("mw").textContent=Math.abs(wv)>4?"turning about the axle ("+Math.round(wa)+"° so far)":(Math.abs(wa)>1?"stopped after turning "+Math.round(wa)+"°":"at rest");
+  }
+  function stepMotion(dt){
+    var F=+$("fm").value,damp=Math.max(0,1-0.35*dt);
+    if(mdrag!=="ball"){
+      if(pushing)bv+=F*28*dt;
+      bx+=bv*dt;bv*=damp;
+      if(bx>=300){bx=300;bv=0}
+      if(bx<=50){bx=50;bv=0}
+    }
+    if(mdrag!=="wheel"){
+      if(pushing)wv+=F*45*dt;
+      wa+=wv*dt;wv*=damp;
+    }
+    drawMotion();
+  }
+  $("fm").addEventListener("input",drawMotion);
+  var pb=$("mgo");
+  pb.addEventListener("pointerdown",function(e){pushing=true;e.preventDefault()});
+  ["pointerup","pointerleave","pointercancel","blur"].forEach(function(n){pb.addEventListener(n,function(){pushing=false})});
+  pb.addEventListener("keydown",function(e){if(e.key===" "||e.key==="Enter"){pushing=true;e.preventDefault()}});
+  pb.addEventListener("keyup",function(){pushing=false});
+  $("mrst").addEventListener("click",function(){bx=90;bv=0;wa=0;wv=0;pushing=false;drawMotion()});
+  var mOff=0,mLastX=0,mLastA=0,mLastT=0;
+  drag($("svgMotion"),".grab",{
+    start:function(pt,e,t){
+      mLastT=performance.now();
+      if(t.id==="ball"){mdrag="ball";bv=0;mOff=pt.x-bx;mLastX=bx}
+      else{mdrag="wheel";wv=0;mLastA=Math.atan2(pt.y-130,pt.x-480)*180/Math.PI}
+    },
+    move:function(pt){
+      var now=performance.now(),dt=Math.max(0.008,(now-mLastT)/1000);mLastT=now;
+      if(mdrag==="ball"){var nx=clamp(pt.x-mOff,50,300);bv=0.6*bv+0.4*((nx-mLastX)/dt);mLastX=nx;bx=nx}
+      else if(mdrag==="wheel"){var a=Math.atan2(pt.y-130,pt.x-480)*180/Math.PI,d=normA(a-mLastA);mLastA=a;wa+=d;wv=0.6*wv+0.4*(d/dt)}
+      drawMotion();
+    },
+    end:function(){
+      if(mdrag==="ball")bv=clamp(bv,-500,500);
+      if(mdrag==="wheel")wv=clamp(wv,-1500,1500);
+      mdrag=null;
+    }
+  });
+  drawMotion();
+
+  /* ---- 2: moment of a force ---- */
+  var EX={
+    door:{top:"Top view of a door",piv:"hinge",rmax:100,need:6,verb:"The door swings open",bar:55},
+    spanner:{top:"Spanner on a nut, top view",piv:"nut",rmax:40,need:12,verb:"The nut starts to turn",bar:55},
+    pedal:{top:"Bicycle pedal crank, side view",piv:"axle",rmax:25,need:8,verb:"The crank turns",bar:55},
+    wheel:{top:"Steering wheel spoke, front view",piv:"column",rmax:25,need:5,verb:"The wheel turns",bar:55}
+  };
+  var dir=1,HX=70,HY=150;
+  var sup="⁰¹²³⁴⁵⁶⁷⁸⁹";
+  function sci(x){
+    if(x<=0)return "0";
+    var e=Math.floor(Math.log10(x)),m=x/Math.pow(10,e),s=String(Math.abs(e)).split("").map(function(c){return sup[+c]}).join("");
+    return m.toFixed(1)+" × 10"+(e<0?"⁻":"")+s;
+  }
+  function upd1(){
+    var cfg=EX[$("ex1").value],rmax=cfg.rmax,PX=500/rmax;
+    var r1=$("r1");r1.max=rmax;
+    var F=+$("f1").value,r=Math.min(+r1.value,rmax),M=F*r/100,open=M>=cfg.need;
+    $("f1o").textContent=F+" N"; $("r1o").textContent=r+" cm";
+    $("topl").textContent=cfg.top;$("pivl").textContent=cfg.piv;
+    var x=HX+r*PX,len=20+F*1.4,cw=dir>0;
+    var yTip=cw?HY-8:HY+8, yTail=cw?yTip-len:yTip+len;
+    var a=$("arrow");
+    a.setAttribute("x1",x);a.setAttribute("x2",x);a.setAttribute("y1",yTail);a.setAttribute("y2",yTip);
+    a.setAttribute("marker-end",cw?"url(#mCW)":"url(#mACW)");
+    a.style.stroke=cw?"var(--cw)":"var(--acw)";
+    var fl=$("flab");fl.textContent="F = "+F+" N";
+    fl.setAttribute("x",x>470?x-12:x+12);fl.setAttribute("text-anchor",x>470?"end":"start");
+    fl.setAttribute("y",(yTail+yTip)/2);
+    var fh=$("fh");fh.setAttribute("cx",x);fh.setAttribute("cy",yTail);fh.style.stroke=cw?"var(--cw)":"var(--acw)";
+    var yd=cw?182:118;
+    var d=$("rdim");d.setAttribute("x2",Math.max(x,HX+1));d.setAttribute("y1",yd);d.setAttribute("y2",yd);
+    $("rt1").setAttribute("y1",yd-8);$("rt1").setAttribute("y2",yd+8);
+    var t2=$("rt2");t2.setAttribute("x1",x);t2.setAttribute("x2",x);t2.setAttribute("y1",yd-8);t2.setAttribute("y2",yd+8);
+    var rl=$("rlab");rl.textContent="r = "+(r/100).toFixed(2)+" m";rl.setAttribute("x",HX+(Math.max(x,HX+60)-HX)/2);rl.setAttribute("y",cw?206:108);
+    $("door").style.transform="rotate("+(open?dir*cfg.bar:0)+"deg)";
+    $("m1").textContent=F+" N × "+(r/100).toFixed(2)+" m = "+M.toFixed(1)+" N m";
+    $("mc1").textContent=sci(M*1e7)+" dyne cm";
+    $("dd1").textContent=M===0?"none":(cw?"clockwise (negative)":"anticlockwise (positive)");
+    $("dd1").className="v "+(cw?"cw":"acw");
+    $("needv").textContent=cfg.need+" N m";
+    $("mf").style.width=clamp(M/(2*cfg.need)*100,0,100)+"%";
+    $("s1").textContent=open?cfg.verb+": the moment is "+M.toFixed(1)+" N m, at least "+cfg.need+" N m.":
+      (M===0?"Zero moment: a force acting at the pivot cannot turn anything.":"The moment is "+M.toFixed(1)+" N m, below "+cfg.need+" N m. Increase F or r.");
+  }
+  ["f1","r1"].forEach(function(id){$(id).addEventListener("input",upd1)});
+  $("ex1").addEventListener("change",function(){$("r1").value=Math.round(EX[$("ex1").value].rmax*0.4);upd1()});
+  $("dirCW").addEventListener("click",function(){dir=1;$("dirCW").setAttribute("aria-pressed","true");$("dirACW").setAttribute("aria-pressed","false");upd1()});
+  $("dirACW").addEventListener("click",function(){dir=-1;$("dirACW").setAttribute("aria-pressed","true");$("dirCW").setAttribute("aria-pressed","false");upd1()});
+  upd1();
+  drag($("svgMoment"),"#fh",{
+    move:function(pt){
+      var cfg=EX[$("ex1").value],PX=500/cfg.rmax;
+      var r=clamp(Math.round((pt.x-HX)/PX),0,cfg.rmax);
+      var len=Math.abs(pt.y-HY)-8,F=clamp(Math.round((len-20)/1.4),1,50);
+      dir=pt.y<HY?1:-1;
+      $("r1").value=r;$("f1").value=F;
+      $("dirCW").setAttribute("aria-pressed",String(dir>0));$("dirACW").setAttribute("aria-pressed",String(dir<0));
+      upd1();
+    }
+  });
+
+  /* ---- 3: equilibrium ---- */
+  var ex=320,ev=0,eMode="rest",ePlay=!reduce,edrag=false;
+  function drawEq(){
+    var FL=+$("fl").value,FR=+$("fr").value,net=FR-FL;
+    $("flo").textContent=FL+" N";$("fro").textContent=FR+" N";
+    $("blk").setAttribute("x",ex-50);
+    ["nA","wA"].forEach(function(id){var e=$(id);e.setAttribute("x1",ex);e.setAttribute("x2",ex)});
+    tx("nT",ex+10,76);tx("wT",ex+10,212);
+    var y=140,s=9;
+    line("lA",ex-50,y,ex-50-Math.max(FL,0.01)*s,y,FL>0);
+    tx("lT",ex-50-FL*s-4,y-8,FL+" N",FL>0);$("lT").setAttribute("text-anchor","end");
+    line("rA",ex+50,y,ex+50+Math.max(FR,0.01)*s,y,FR>0);
+    tx("rT",ex+50+FR*s+4,y-8,FR+" N",FR>0);$("rT").setAttribute("text-anchor","start");
+    $("lh").setAttribute("cx",ex-50-FL*s);$("rh").setAttribute("cx",ex+50+FR*s);
+    $("e1").textContent=net===0?"0 N (balanced)":Math.abs(net)+" N to the "+(net>0?"right":"left");
+    var vv=Math.abs(ev)<0.005?0:ev;
+    $("e2").textContent=vv===0?"0 m/s (at rest)":vv.toFixed(1)+" m/s "+(vv>0?"to the right":"to the left");
+    var kind=net!==0?"not in equilibrium":(vv===0?"static":"dynamic");
+    $("e3").textContent=kind;
+    $("s4").textContent=net!==0?"The resultant force is "+Math.abs(net)+" N, so the velocity keeps changing. The first condition fails."
+      :(vv===0?"Resultant force is zero and the block is at rest: static equilibrium.":"Resultant force is zero and the block keeps moving with constant velocity: dynamic equilibrium.");
+  }
+  function stepEq(dt){
+    if(ePlay&&!edrag){
+      var net=+$("fr").value-+$("fl").value;
+      ev+=net/2*dt;
+      ex+=ev*40*dt;
+      if(ex>600)ex-=560; if(ex<40)ex+=560;
+    }
+    drawEq();
+  }
+  function eReset(){ex=320;ev=(eMode==="move")?2:0;drawEq()}
+  ["fl","fr"].forEach(function(id){$(id).addEventListener("input",drawEq)});
+  $("eqRest").addEventListener("click",function(){eMode="rest";$("eqRest").setAttribute("aria-pressed","true");$("eqMove").setAttribute("aria-pressed","false");eReset()});
+  $("eqMove").addEventListener("click",function(){eMode="move";$("eqMove").setAttribute("aria-pressed","true");$("eqRest").setAttribute("aria-pressed","false");eReset()});
+  $("erst").addEventListener("click",eReset);
+  $("epp").addEventListener("click",function(){ePlay=!ePlay;$("epp").textContent=ePlay?"Pause":"Play"});
+  $("epp").textContent=ePlay?"Pause":"Play";
+  drawEq();
+  var eOff=0,eLastX=0,eLastT=0;
+  drag($("svgEq"),".grab",{
+    start:function(pt,e,t){
+      if(t.id==="blk"){edrag=true;ev=0;eOff=pt.x-ex;eLastX=ex;eLastT=performance.now()}
+    },
+    move:function(pt,e,t){
+      if(t.id==="blk"){
+        var now=performance.now(),dt=Math.max(0.008,(now-eLastT)/1000);eLastT=now;
+        var nx=clamp(pt.x-eOff,60,580);ev=0.6*ev+0.4*((nx-eLastX)/dt/40);eLastX=nx;ex=nx;drawEq();
+      }else if(t.id==="lh"){$("fl").value=clamp(Math.round((ex-50-pt.x)/9),0,10);drawEq()}
+      else if(t.id==="rh"){$("fr").value=clamp(Math.round((pt.x-(ex+50))/9),0,10);drawEq()}
+    },
+    end:function(pt,e,t){
+      if(t.id==="blk"){edrag=false;ev=clamp(ev,-4,4);if(Math.abs(ev)<0.15)ev=0;drawEq()}
+    }
+  });
+
+  /* ---- 4: principle of moments ---- */
+  var CX=340,CY=170,S=6,ang=0,target=0;
+  var ticks=$("ticks");
+  for(var k=0;k<=100;k+=10){
+    var tx0=40+k*S;
+    ticks.appendChild(mk("line",{x1:tx0,x2:tx0,y1:163,y2:k%50===0?174:169,style:"stroke:var(--fg);stroke-width:1.5"}));
+    ticks.appendChild(mk("text",{x:tx0,y:157,"text-anchor":"middle","class":"m mut"},k));
+  }
+  function drawW(){
+    var g=$("wts");g.textContent="";
+    var rad=ang*Math.PI/180;
+    [{w:+$("w1").value,d:+$("d1").value,side:-1,name:"d₁",col:"var(--acw)"},
+     {w:+$("w2").value,d:+$("d2").value,side:1,name:"d₂",col:"var(--cw)"}].forEach(function(o){
+      var s=o.side*o.d*S,px=CX+s*Math.cos(rad),py=CY+s*Math.sin(rad)+8;
+      var size=22+o.w*1.6,hook=18;
+      var grp=mk("g",{"data-side":o.side,style:"cursor:grab;touch-action:none"});
+      grp.appendChild(mk("line",{x1:px,y1:py,x2:px,y2:py+hook,"stroke-width":2,style:"stroke:var(--fg)"}));
+      grp.appendChild(mk("rect",{x:px-size/2,y:py+hook,width:size,height:size,rx:3,style:"fill:var(--soft);stroke:"+o.col+";stroke-width:3"}));
+      grp.appendChild(mk("text",{x:px,y:py+hook+size/2+4,"text-anchor":"middle","class":"m",style:"pointer-events:none"},o.w+" N"));
+      grp.appendChild(mk("text",{x:px,y:py+hook+size+16,"text-anchor":"middle","class":"m mut",style:"pointer-events:none"},o.name+" = "+o.d+" cm"));
+      g.appendChild(grp);
+    });
+    $("rule").setAttribute("transform","rotate("+ang+" "+CX+" "+CY+")");
+  }
+  function stepRule(){
+    if(ang!==target){
+      ang+=(target-ang)*0.16;
+      if(Math.abs(target-ang)<0.02||reduce)ang=target;
+      drawW();
+    }
+  }
+  function isBal(){return Math.abs(+$("w1").value*+$("d1").value-+$("w2").value*+$("d2").value)<0.01}
+  function upd2(){
+    var w1=+$("w1").value,d1=+$("d1").value,w2=+$("w2").value,d2=+$("d2").value;
+    $("w1o").textContent=w1+" N";$("d1o").textContent=d1+" cm";$("w2o").textContent=w2+" N";$("d2o").textContent=d2+" cm";
+    var a=w1*d1,c=w2*d2,diff=a-c;
+    $("acw").textContent=w1+" N × "+(d1/100)+" m = "+(a/100).toFixed(2)+" N m";
+    $("cwm").textContent=w2+" N × "+(d2/100)+" m = "+(c/100).toFixed(2)+" N m";
+    $("rea").textContent=(w1+w2)+" N = W₁ + W₂";
+    target=-clamp(diff/100*10,-12,12);
+    $("s2").textContent=isBal()?"Balanced. Anticlockwise moment equals clockwise moment, and the pivot's upward push equals the total weight, so both conditions of equilibrium hold.":
+      (diff>0?"The left side goes down: the anticlockwise moment is larger by "+(diff/100).toFixed(2)+" N m.":"The right side goes down: the clockwise moment is larger by "+(-diff/100).toFixed(2)+" N m.");
+    drawW();
+  }
+  ["w1","d1","w2","d2"].forEach(function(id){$(id).addEventListener("input",upd2)});
+  $("bal").addEventListener("click",function(){
+    var d2=clamp(Math.round(+$("w1").value*+$("d1").value/+$("w2").value*2)/2,5,50);
+    $("d2").value=d2;upd2();
+  });
+  var recs=[];
+  function renderRecs(){
+    var b=$("rows");
+    if(!recs.length){b.innerHTML='<tr><td colspan="7" class="note">No readings yet.</td></tr>';return}
+    b.innerHTML=recs.map(function(r,i){return "<tr><td>"+(i+1)+"</td><td class='n'>"+r[0]+"</td><td class='n'>"+r[1]+"</td><td class='n'>"+(r[0]*r[1])+"</td><td class='n'>"+r[2]+"</td><td class='n'>"+r[3]+"</td><td class='n'>"+(r[2]*r[3])+"</td></tr>"}).join("");
+  }
+  $("rec").addEventListener("click",function(){
+    if(!isBal()){$("s2").textContent="The rule is not level yet. Balance it first, then record the reading.";return}
+    if(recs.length>=6)recs.shift();
+    recs.push([+$("w1").value,+$("d1").value,+$("w2").value,+$("d2").value]);renderRecs();
+  });
+  $("recx").addEventListener("click",function(){recs=[];renderRecs()});
+  upd2();ang=target;drawW();
+  drag($("svgRule"),"[data-side]",{
+    move:function(pt,e,t){
+      var side=+t.getAttribute("data-side"),rad=ang*Math.PI/180;
+      var sp=(pt.x-CX)*Math.cos(rad)+(pt.y-CY)*Math.sin(rad);
+      var d=clamp(Math.round(Math.abs(sp)/S*2)/2,5,50);
+      $(side<0?"d1":"d2").value=d;upd2();
+    }
+  });
+
+  /* ---- 5: centre of gravity ---- */
+  var SH={
+    rod:{n:"Rod",g:[320,125],svg:'<rect x="190" y="118" width="260" height="14" class="solid"/>',t:"Rod: the mid-point."},
+    disc:{n:"Circular disc",g:[320,125],svg:'<circle cx="320" cy="125" r="75" class="solid"/>',t:"Circular disc: its geometric centre."},
+    ring:{n:"Circular ring",g:[320,125],svg:'<circle cx="320" cy="125" r="75" class="ink" style="stroke-width:8"/>',t:"Ring: the centre, where there is no material at all."},
+    rect:{n:"Rectangle",g:[320,125],svg:'<rect x="210" y="65" width="220" height="120" class="solid"/><line x1="210" y1="65" x2="430" y2="185" class="dash"/><line x1="430" y1="65" x2="210" y2="185" class="dash"/>',t:"Rectangle: where the two diagonals cross."},
+    tri:{n:"Triangle",g:[326.67,148.33],svg:'<polygon points="320,55 220,195 440,195" class="solid"/><line x1="320" y1="55" x2="330" y2="195" class="dash"/><line x1="220" y1="195" x2="380" y2="125" class="dash"/><line x1="440" y1="195" x2="270" y2="125" class="dash"/>',t:"Triangular lamina: where the three medians meet."},
+    cyl:{n:"Cylinder",g:[320,125],svg:'<rect x="250" y="60" width="140" height="130" class="solid"/><ellipse cx="320" cy="60" rx="70" ry="14" class="solid"/><ellipse cx="320" cy="190" rx="70" ry="14" class="solid"/><line x1="320" y1="60" x2="320" y2="190" class="dash"/>',t:"Cylinder: the mid-point of its axis."},
+    cone:{n:"Solid cone",g:[320,160],svg:'<polygon points="320,40 240,200 400,200" class="solid"/><ellipse cx="320" cy="200" rx="80" ry="14" class="solid"/><line x1="320" y1="40" x2="320" y2="200" class="dash"/>',t:"Solid cone: on the axis, one quarter of the height (h/4) above the base."},
+    hcone:{n:"Hollow cone",g:[320,146.67],svg:'<polygon points="320,40 240,200 400,200" class="solid" style="fill:none"/><ellipse cx="320" cy="200" rx="80" ry="14" class="solid" style="fill:none"/><line x1="320" y1="40" x2="320" y2="200" class="dash"/>',t:"Hollow cone: on the axis, one third of the height (h/3) above the base."}
+  };
+  var sb=$("shapeBtns");
+  Object.keys(SH).forEach(function(k){
+    var b=document.createElement("button");b.className="btn";b.textContent=SH[k].n;b.setAttribute("aria-pressed","false");b.dataset.k=k;
+    b.addEventListener("click",function(){setShape(k)});sb.appendChild(b);
+  });
+  function setShape(k){
+    var s=SH[k];
+    [].forEach.call(sb.children,function(b){b.setAttribute("aria-pressed",String(b.dataset.k===k))});
+    $("shape").innerHTML=s.svg+'<circle cx="'+s.g[0]+'" cy="'+s.g[1]+'" r="6" class="gdot"/><text x="'+(s.g[0]+12)+'" y="'+(s.g[1]-8)+'" class="m">G</text>';
+    $("gnote").textContent=s.t;
+  }
+  setShape("rod");
+
+  /* irregular lamina */
+  var P=[[-90,-40],[-30,-80],[50,-70],[100,-10],[70,60],[-10,90],[-80,50]];
+  var HL={A:[-70,-30],B:[80,-20],C:[-10,72]},COL={A:"var(--acw)",B:"var(--cw)",C:"var(--vel)"};
+  var G=(function(){var A=0,cx=0,cy=0,n=P.length;for(var i=0;i<n;i++){var a=P[i],b=P[(i+1)%n],c=a[0]*b[1]-b[0]*a[1];A+=c;cx+=(a[0]+b[0])*c;cy+=(a[1]+b[1])*c}A/=2;return [cx/(6*A),cy/(6*A)]})();
+  function inside(x,y){var c=false;for(var i=0,j=P.length-1;i<P.length;j=i++){var a=P[i],b=P[j];if(((a[1]>y)!==(b[1]>y))&&(x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0]))c=!c}return c}
+  $("lamPoly").setAttribute("points",P.map(function(p){return p.join(",")}).join(" "));
+  var lamHoles=$("holes");
+  Object.keys(HL).forEach(function(k){
+    lamHoles.appendChild(mk("circle",{cx:HL[k][0],cy:HL[k][1],r:4,style:"fill:var(--panel);stroke:var(--fg);stroke-width:2"}));
+    lamHoles.appendChild(mk("text",{x:HL[k][0]+8,y:HL[k][1]-6,"class":"m",style:"pointer-events:none"},k));
+    lamHoles.appendChild(mk("circle",{cx:HL[k][0],cy:HL[k][1],r:13,"data-hole":k,style:"fill:transparent;cursor:pointer;touch-action:none"}));
+  });
+  var PIN=[320,30];
+  var L={hx:0,hy:0,phi:0},LT={hx:0,hy:0,phi:0},used={},hung=null;
+  function lamTransform(){
+    $("lam").setAttribute("transform","translate("+PIN[0]+","+(hung?PIN[1]:PIN[1]+90)+") rotate("+L.phi+") translate("+(-L.hx)+","+(-L.hy)+")");
+  }
+  var phiv=0,ldrag=false,lPrev=0;
+  function stepLamina(dt){
+    ["hx","hy"].forEach(function(k){var d=LT[k]-L[k];if(Math.abs(d)>0.02&&!reduce)L[k]+=d*0.12;else L[k]=LT[k]});
+    if(!ldrag){
+      if(reduce){L.phi=LT.phi;phiv=0}
+      else{
+        phiv+=(-60*(L.phi-LT.phi)-4*phiv)*dt;L.phi+=phiv*dt;
+        if(Math.abs(L.phi-LT.phi)<0.05&&Math.abs(phiv)<0.5){L.phi=LT.phi;phiv=0}
+      }
+    }
+    lamTransform();
+    $("plumb").style.display=hung?"":"none";$("bob").style.display=hung?"":"none";
+  }
+  function hang(k){
+    hung=k;used[k]=true;
+    var h=HL[k],vx=G[0]-h[0],vy=G[1]-h[1];
+    var target=90-Math.atan2(vy,vx)*180/Math.PI;
+    var cur=L.phi;
+    while(target-cur>180)target-=360;while(target-cur<-180)target+=360;
+    LT={hx:h[0],hy:h[1],phi:target};
+    if(!hung||Object.keys(used).length===1){L.hx=h[0]*0;L.hy=h[1]*0}
+    drawChalk();
+    var n=Object.keys(used).length;
+    var gg=$("lamG"),gt=$("lamGt");
+    if(n>=2){gg.style.display="";gg.setAttribute("cx",G[0]);gg.setAttribute("cy",G[1]);gt.style.display="";gt.setAttribute("x",G[0]+10);gt.setAttribute("y",G[1]-8)}
+    $("s5").textContent=n<2?"Hung from hole "+k+". The plumb line is vertical and G is somewhere on it. Hang the lamina from another hole.":
+      (n<3?"Two lines cross at one point. That point is the centre of gravity G.":"All three lines cross at the same point G. This is how the C.G. of an irregular lamina is found.");
+  }
+  function drawChalk(){
+    var g=$("chalk");g.textContent="";
+    Object.keys(used).forEach(function(k){
+      var h=HL[k],dx=G[0]-h[0],dy=G[1]-h[1],m=Math.hypot(dx,dy),ux=dx/m,uy=dy/m,t=0;
+      while(inside(h[0]+ux*t,h[1]+uy*t)&&t<400)t+=1;
+      g.appendChild(mk("line",{x1:h[0],y1:h[1],x2:h[0]+ux*(t-1),y2:h[1]+uy*(t-1),"stroke-width":2.5,style:"stroke:"+COL[k]}));
+    });
+  }
+  ["A","B","C"].forEach(function(k){$("h"+k).addEventListener("click",function(){hang(k)})});
+  $("hX").addEventListener("click",function(){
+    used={};hung=null;LT={hx:0,hy:0,phi:0};L={hx:0,hy:0,phi:0};
+    $("chalk").textContent="";$("lamG").style.display="none";$("lamGt").style.display="none";
+    $("s5").textContent="Choose a hole to hang the lamina from.";lamTransform();
+  });
+  lamTransform();$("plumb").style.display="none";$("bob").style.display="none";
+
+  drag($("svgLam"),"[data-hole]",{start:function(pt,e,t){hang(t.getAttribute("data-hole"))}});
+  drag($("svgLam"),"#lamPoly",{
+    start:function(pt){ldrag=!!hung;lPrev=Math.atan2(pt.y-PIN[1],pt.x-PIN[0])*180/Math.PI;phiv=0},
+    move:function(pt){
+      if(!ldrag)return;
+      var a=Math.atan2(pt.y-PIN[1],pt.x-PIN[0])*180/Math.PI;L.phi+=normA(a-lPrev);lPrev=a;phiv=0;
+    },
+    end:function(){
+      if(!ldrag)return;
+      ldrag=false;phiv=0;L.phi=LT.phi+normA(L.phi-LT.phi);
+    }
+  });
+
+  /* pencil tip */
+  var GW=[320+G[0],130+G[1]],tip=[190,80],showG=false;
+  $("pPoly").setAttribute("points",P.map(function(p){return (p[0]+320)+","+(p[1]+130)}).join(" "));
+  function drawPencil(){
+    var t=$("tip");t.setAttribute("cx",tip[0]);t.setAttribute("cy",tip[1]);
+    var dx=GW[0]-tip[0],dy=GW[1]-tip[1],d=Math.hypot(dx,dy),on=inside(tip[0]-320,tip[1]-130),bal=on&&d<8;
+    var g=$("pG");g.style.display=(showG||bal)?"":"none";g.setAttribute("cx",GW[0]);g.setAttribute("cy",GW[1]);
+    if(on&&!bal){var Ln=Math.min(70,14+d*0.8);line("ptilt",tip[0]+dx/d*12,tip[1]+dy/d*12,tip[0]+dx/d*(12+Ln),tip[1]+dy/d*(12+Ln),true)}
+    else $("ptilt").style.display="none";
+    $("s5c").textContent=!on?"The tip is not under the cardboard. Drag it onto the cardboard.":
+      (bal?"Balanced. The tip is directly under the centre of gravity G, so the weight has no moment about the tip.":
+      "Not balanced. The cardboard tips toward the side where G is (arrow). Move the tip that way.");
+  }
+  drag($("svgPencil"),"#tip",{move:function(pt){tip=[clamp(pt.x,20,620),clamp(pt.y,20,240)];drawPencil()}});
+  $("pShow").addEventListener("click",function(){showG=!showG;$("pShow").textContent=showG?"Hide G":"Show where G is";drawPencil()});
+  $("pRst").addEventListener("click",function(){tip=[190,80];drawPencil()});
+  drawPencil();
+
+  /* balance point */
+  function updBal(){
+    var p=+$("bp").value,sx=40+p*6,a=clamp((50-p)*0.6,-15,15);
+    $("bpo").textContent=p+" cm";
+    $("brule").setAttribute("transform","rotate("+a+" "+sx+" 87)");
+    $("bsup").setAttribute("points",sx+",94 "+(sx-16)+",140 "+(sx+16)+",140");
+    $("s5b").textContent=p===50?"Balanced: the support is directly under G.":
+      "Not balanced: G is on the "+(p<50?"right":"left")+" of the support, so its weight turns the rule "+(p<50?"clockwise":"anticlockwise")+".";
+  }
+  $("bp").addEventListener("input",updBal);updBal();
+  drag($("svgBal"),"#bsup",{move:function(pt){$("bp").value=clamp(Math.round((pt.x-40)/6),20,80);updBal()}});
+
+  /* ---- 6: circular motion ---- */
+  var C3={string:{c:"hand",r:6,f:"tension in the string",cut:"Cut the string",str:true,msg:"string cut"},
+          moon:{c:"Earth",r:16,f:"gravity of the Earth",cut:"Switch off gravity",str:false,msg:"gravity switched off"},
+          planet:{c:"Sun",r:20,f:"gravity of the Sun",cut:"Switch off gravity",str:false,msg:"gravity switched off"},
+          electron:{c:"nucleus",r:5,f:"electric attraction of the nucleus",cut:"Switch off attraction",str:false,msg:"attraction switched off"}};
+  var CX3=320,CY3=170,theta=0,running=!reduce,free=false,fx=0,fy=0,fvx=0,fvy=0;
+  var show3={v:true,c:true,f:false};
+  function setBtn(id,key){$(id).addEventListener("click",function(){show3[key]=!show3[key];$(id).setAttribute("aria-pressed",String(show3[key]));draw3()})}
+  setBtn("tv","v");setBtn("tc","c");setBtn("tf","f");
+  function names(b){var n=["North","North-east","East","South-east","South","South-west","West","North-west"];return n[Math.round(b/45)%8]}
+  function draw3(){
+    var cfg=C3[$("ex3").value],R=+$("rad").value,v=+$("sp").value;
+    $("spo").textContent=v;$("rado").textContent=R;
+    $("r0s").textContent=cfg.f;
+    $("cut").textContent=cfg.cut;
+    $("r1s").textContent="constant ("+v+" units)";
+    $("orbit").setAttribute("r",R);
+    $("cdot").setAttribute("r",cfg.r);$("clab").textContent=cfg.c;$("clab").setAttribute("y",CY3-cfg.r-8);
+    var ux,uy,x,y;
+    if(free){x=fx;y=fy;ux=fvx/v;uy=fvy/v}
+    else{x=CX3+R*Math.cos(theta);y=CY3-R*Math.sin(theta);ux=-Math.sin(theta);uy=-Math.cos(theta)}
+    $("stone").setAttribute("cx",x);$("stone").setAttribute("cy",y);
+    var s=$("string");s.style.display=(cfg.str&&!free)?"":"none";s.setAttribute("x2",x);s.setAttribute("y2",y);
+    var vl=30+v*0.2;
+    line("vel",x+ux*12,y+uy*12,x+ux*(12+vl),y+uy*(12+vl),show3.v);
+    tx("tvel",x+ux*(18+vl)+6,y+uy*(18+vl),"v",show3.v);
+    var inx=(CX3-x)/R,iny=(CY3-y)/R,showC=show3.c&&!free;
+    line("cen",x+inx*14,y+iny*14,x+inx*64,y+iny*64,showC);
+    tx("tcen",x+inx*40+8,y+iny*40,"centripetal",showC);
+    var showF=show3.f&&!free;
+    line("fug",x-inx*14,y-iny*14,x-inx*64,y-iny*64,showF);
+    tx("tfug",x-inx*40+8,y-iny*70,"centrifugal (imagined)",showF);
+    var bearing=(Math.atan2(ux,-uy)*180/Math.PI+360)%360;
+    $("r2s").textContent=names(bearing)+" ("+Math.round(bearing)+"° from N)";
+    $("r3s").textContent=free?"No: constant velocity":"Yes: direction keeps changing";
+    $("s3").textContent=free?"With the "+cfg.msg+" there is no centripetal force, so the body moves in a straight line along the tangent.":
+      "Speed stays the same, but the direction of motion changes all the time, so the velocity changes. The "+cfg.f+" supplies the centripetal force.";
+  }
+  function stepCirc(dt){
+    var R=+$("rad").value,v=+$("sp").value;
+    if(running){
+      if(free){fx+=fvx*dt;fy+=fvy*dt;if(fx<-40||fx>680||fy<-40||fy>380){running=false;$("pp").textContent="Play"}}
+      else theta+=v/R*dt;
+    }
+    draw3();
+  }
+  $("pp").addEventListener("click",function(){running=!running;$("pp").textContent=running?"Pause":"Play"});
+  $("cut").addEventListener("click",function(){
+    if(free)return;
+    var R=+$("rad").value,v=+$("sp").value;
+    fx=CX3+R*Math.cos(theta);fy=CY3-R*Math.sin(theta);
+    fvx=-Math.sin(theta)*v;fvy=-Math.cos(theta)*v;free=true;running=true;$("pp").textContent="Pause";
+  });
+  $("rst").addEventListener("click",function(){free=false;theta=0;running=true;$("pp").textContent="Pause";draw3()});
+  $("ex3").addEventListener("change",function(){free=false;draw3()});
+  ["sp","rad"].forEach(function(id){$(id).addEventListener("input",function(){
+    if(free){var v=+$("sp").value,m=Math.hypot(fvx,fvy)||1;fvx=fvx/m*v;fvy=fvy/m*v}draw3()})});
+  $("pp").textContent=running?"Pause":"Play";
+  draw3();
+
+  var cdrag=false,wasRun=true;
+  drag($("svgCirc"),"#stone",{
+    start:function(){if(free)return;cdrag=true;wasRun=running;running=false},
+    move:function(pt){
+      if(!cdrag)return;
+      var dx=pt.x-CX3,dy=pt.y-CY3;
+      theta=Math.atan2(-dy,dx);
+      $("rad").value=clamp(Math.round(Math.hypot(dx,dy)/5)*5,60,140);
+      draw3();
+    },
+    end:function(){if(!cdrag)return;cdrag=false;running=wasRun}
+  });
+
+  /* ---- 7: numericals ---- */
+  function pick(a){return a[Math.floor(Math.random()*a.length)]}
+  function r2(x){return Math.round(x*100)/100}
+  var GEN=[
+    function(){var F=pick([10,15,20,25,30,40,50,60]),r=pick([20,30,40,50,60,80]),M=r2(F*r/100);
+      return {q:"A force of "+F+" N acts at right angles to an arm, "+r+" cm from the pivot. Find the moment of the force about the pivot.",unit:"N m",ans:M,
+        work:"M = F × r\nr = "+r+" cm = "+(r/100)+" m\nM = "+F+" N × "+(r/100)+" m = "+M+" N m"}},
+    function(){var F=pick([10,15,20,25,30,40]),r=pick([0.2,0.3,0.4,0.5,0.6,0.8]),M=r2(F*r);
+      return {q:"A force acting at right angles at a distance of "+(r*100)+" cm from a pivot has a moment of "+M+" N m. Find the force.",unit:"N",ans:F,
+        work:"M = F × r  so  F = M ÷ r\nr = "+(r*100)+" cm = "+r+" m\nF = "+M+" N m ÷ "+r+" m = "+F+" N"}},
+    function(){var F1=pick([120,150,200]),L1=pick([20,30,40]),F2=pick([40,50,60,75,100]),L2=r2(F1*L1/F2);
+      return {q:"A nut is loosened by a force of "+F1+" N on a spanner whose handle is "+L1+" cm long. How long must the handle be (in cm) if only "+F2+" N is to be applied?",unit:"cm",ans:L2,
+        work:"Same moment needed: F₁ × L₁ = F₂ × L₂\n"+F1+" N × "+L1+" cm = "+F2+" N × L₂\nL₂ = "+(F1*L1)+" ÷ "+F2+" = "+L2+" cm"}},
+    function(){var w1,d1,w2,d2,t=0;do{w1=pick([4,6,8,10,12]);d1=pick([20,30,40,50]);w2=pick([2,3,4,5,6,8,10,12,15]);d2=r2(w1*d1/w2);t++}while((d2<10||d2>60)&&t<50);
+      return {q:"A uniform metre rule is balanced on a pivot at its centre. A weight of "+w1+" N hangs "+d1+" cm to the left of the pivot. At what distance (in cm) to the right must a weight of "+w2+" N hang to balance it?",unit:"cm",ans:d2,
+        work:"Principle of moments: anticlockwise moment = clockwise moment\n"+w1+" N × "+d1+" cm = "+w2+" N × d\nd = "+(w1*d1)+" ÷ "+w2+" = "+d2+" cm"}},
+    function(){var p=pick([60,70,75]),m=pick([10,20,30,40]),M=r2(m*(100-p)/(p-50));
+      return {q:"A uniform metre rule balances horizontally on a knife edge at the "+p+" cm mark when a mass of "+m+" g is hung from the 100 cm end. Find the mass of the rule in g.",unit:"g",ans:M,
+        work:"The rule's weight acts at its 50 cm mark, "+(p-50)+" cm from the knife edge (anticlockwise).\nThe hung mass is "+(100-p)+" cm from the knife edge (clockwise).\nM × "+(p-50)+" = "+m+" × "+(100-p)+"\nM = "+(m*(100-p))+" ÷ "+(p-50)+" = "+M+" g"}},
+    function(){var m1=pick([20,30,40]),m2=pick([25,35,45]),d1=pick([1,1.5,2]),d2=pick([1,1.5,2.5]),M=pick([50,60,75]),x=r2((m1*d1+m2*d2)/M);
+      return {q:"Two children of mass "+m1+" kg and "+m2+" kg sit on one side of a see-saw, "+d1+" m and "+d2+" m from the middle. A person of mass "+M+" kg sits on the other side. How far (in m) from the middle must the person sit to balance it?",unit:"m",ans:x,
+        work:"Anticlockwise moment = "+m1+"g × "+d1+" + "+m2+"g × "+d2+" = "+r2(m1*d1+m2*d2)+"g\nClockwise moment = "+M+"g × x\n"+M+"x = "+r2(m1*d1+m2*d2)+"  (g cancels)\nx = "+r2(m1*d1+m2*d2)+" ÷ "+M+" = "+x+" m"}}
+  ];
+  var cp=null,right=0,tried=0,attempted=false,counted=false;
+  function newProb(){
+    cp=pick(GEN)();attempted=false;counted=false;
+    $("nq").textContent=cp.q;$("nunit").textContent=cp.unit;$("nans").value="";
+    $("nfb").textContent="Enter your answer and press Check.";$("nwork").hidden=true;$("nshow").disabled=true;
+  }
+  $("nchk").addEventListener("click",function(){
+    var v=parseFloat($("nans").value);
+    if(isNaN(v)){$("nfb").textContent="Type a number first.";return}
+    attempted=true;$("nshow").disabled=false;
+    var ok=Math.abs(v-cp.ans)<=Math.max(0.01,Math.abs(cp.ans)*0.01);
+    if(!counted){tried++;if(ok)right++;counted=true;$("nscore").textContent=right+" of "+tried}
+    $("nfb").textContent=ok?"Correct: "+cp.ans+" "+cp.unit+".":"Not quite. Check your units (cm to m) and which moments are on which side, then try again or show the working.";
+  });
+  $("nshow").addEventListener("click",function(){$("nwork").textContent=cp.work+"\nAnswer: "+cp.ans+" "+cp.unit;$("nwork").hidden=false});
+  $("nnew").addEventListener("click",newProb);
+  newProb();
+
+  var h=(location.hash||"").replace("#","");
+  if(ids.indexOf(h)>-1)show(h);
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
