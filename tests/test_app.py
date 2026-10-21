@@ -229,3 +229,52 @@ def test_streak_requires_login(client):
 def test_theme_script_public(client):
     r = client.get("/theme.js")
     assert r.status_code == 200 and "data-theme" in r.text
+
+
+PW = "class-secret-123"
+
+
+def pw_login(c, email="Kid@Example.com", password=PW):
+    return c.post("/api/auth/password", json={"email": email, "password": password})
+
+
+def test_password_login_disabled_by_default(client):
+    assert client.get("/api/config").json()["passwordLogin"] is False
+    assert pw_login(client).status_code == 404
+
+
+def test_password_login(client, monkeypatch):
+    monkeypatch.setenv("DEFAULT_PASSWORD", PW)
+    c = TestClient(create_app(verify=fake_verify), follow_redirects=False)
+    assert c.get("/api/config").json()["passwordLogin"] is True
+    assert pw_login(c, password="nope").status_code == 401
+    assert pw_login(c, email="not-an-email").status_code == 422
+    r = pw_login(c)
+    assert r.status_code == 200 and r.json()["profileComplete"] is False
+    assert c.get("/").headers["location"] == "/profile.html"
+    complete_profile(c)
+    assert c.get("/").status_code == 200
+    assert c.get("/api/me").json()["email"] == "kid@example.com"
+    c.put("/api/progress", json={"done": [1]})
+    c.post("/api/logout")
+    pw_login(c, email="KID@example.com")  # email is case-insensitive: same student
+    assert c.get("/api/progress").json() == {"done": [1]}
+    events = rows("SELECT event, method FROM login_events ORDER BY id")
+    assert ("denied", "password") in events and ("login", "password") in events
+
+
+def test_password_login_respects_allowlist(client, monkeypatch):
+    monkeypatch.setenv("DEFAULT_PASSWORD", PW)
+    monkeypatch.setenv("ALLOWED_DOMAINS", "school.org")
+    c = TestClient(create_app(verify=fake_verify))
+    assert pw_login(c).status_code == 403
+    assert pw_login(c, email="a@school.org").status_code == 200
+
+
+def test_password_login_rate_limited(client, monkeypatch):
+    monkeypatch.setenv("DEFAULT_PASSWORD", PW)
+    c = TestClient(create_app(verify=fake_verify))
+    for _ in range(10):
+        assert pw_login(c, password="wrong").status_code == 401
+    assert pw_login(c, password="wrong").status_code == 429
+    assert pw_login(c).status_code == 429  # even the right password waits out the lockout

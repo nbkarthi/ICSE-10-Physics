@@ -2,6 +2,7 @@
 
 Run:  uv run --env-file .env uvicorn server.app:create_app --factory --port 8000
 """
+import hmac
 import os
 import re
 import time
@@ -20,6 +21,8 @@ from starlette.middleware.sessions import SessionMiddleware
 
 ROOT = Path(__file__).resolve().parent.parent
 CHAPTER_COUNT = 12
+EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s]{2,}$")
+MAX_FAILED_LOGINS, FAILED_WINDOW = 10, 15 * 60
 SCHEMA_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 CHAPTER_PAGE = re.compile(r"^chapter-\d{2}-[a-z0-9-]+\.html$")
 GATED_PAGE = re.compile(r"^(index|chapter-\d{2}-[a-z0-9-]+)\.html$")
@@ -69,6 +72,8 @@ def create_app(verify=verify_google_credential) -> FastAPI:
     db_url = os.environ.get("DATABASE_URL", "")
     schema = os.environ.get("DB_SCHEMA", "icse_physics")
     session_seconds = int(float(os.environ.get("SESSION_HOURS", "24")) * 3600)
+    default_password = os.environ.get("DEFAULT_PASSWORD", "")
+    failed: dict[str, list[float]] = {}
     tz = ZoneInfo(os.environ.get("STUDY_TIMEZONE", "Asia/Kolkata"))
     if not db_url:
         raise RuntimeError("DATABASE_URL must be set (Postgres)")
@@ -96,6 +101,7 @@ def create_app(verify=verify_google_credential) -> FastAPI:
               id BIGSERIAL PRIMARY KEY, sub TEXT, email TEXT,
               event TEXT NOT NULL CHECK (event IN ('login', 'logout', 'denied')),
               at TIMESTAMPTZ NOT NULL DEFAULT now(), ip TEXT, user_agent TEXT);
+            ALTER TABLE login_events ADD COLUMN IF NOT EXISTS method TEXT;
             CREATE INDEX IF NOT EXISTS login_events_sub_at ON login_events (sub, at DESC);
             CREATE TABLE IF NOT EXISTS study_days (
               sub TEXT NOT NULL REFERENCES students(sub), day DATE NOT NULL,
@@ -106,12 +112,17 @@ def create_app(verify=verify_google_credential) -> FastAPI:
             """
         )
 
-    def log_event(conn, request: Request, event: str, sub: str | None, email: str | None) -> None:
+    def log_event(conn, request: Request, event: str, sub: str | None, email: str | None, method: str = "google") -> None:
         ip = request.client.host if request.client else None
         conn.execute(
-            "INSERT INTO login_events (sub, email, event, ip, user_agent) VALUES (%s, %s, %s, %s, %s)",
-            (sub, email, event, ip, (request.headers.get("user-agent") or "")[:300]),
+            "INSERT INTO login_events (sub, email, event, ip, user_agent, method) VALUES (%s, %s, %s, %s, %s, %s)",
+            (sub, email, event, ip, (request.headers.get("user-agent") or "")[:300], method),
         )
+
+    def is_allowed(email: str) -> bool:
+        if not (allowed_emails or allowed_domains):
+            return True
+        return email in allowed_emails or email.rsplit("@", 1)[-1] in allowed_domains
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(
@@ -139,7 +150,7 @@ def create_app(verify=verify_google_credential) -> FastAPI:
 
     @app.get("/api/config")
     def config():
-        return {"googleClientId": client_id}
+        return {"googleClientId": client_id, "passwordLogin": bool(default_password)}
 
     @app.post("/api/auth/google")
     async def auth_google(request: Request):
@@ -156,8 +167,7 @@ def create_app(verify=verify_google_credential) -> FastAPI:
         email = str(claims.get("email", "")).lower()
         if not email or claims.get("email_verified") is not True:
             raise HTTPException(status_code=403, detail="Google account email is not verified")
-        domain = email.rsplit("@", 1)[-1]
-        if (allowed_emails or allowed_domains) and email not in allowed_emails and domain not in allowed_domains:
+        if not is_allowed(email):
             with db() as conn:
                 log_event(conn, request, "denied", claims.get("sub"), email)
             raise HTTPException(status_code=403, detail="This account is not allowed. Ask your teacher for access.")
@@ -187,6 +197,47 @@ def create_app(verify=verify_google_credential) -> FastAPI:
             "school": row["school"] or "",
             "profileComplete": row["profile_completed_at"] is not None,
         }
+
+    @app.post("/api/auth/password")
+    async def auth_password(request: Request):
+        """Sign in with the shared class password. Only available when DEFAULT_PASSWORD is set on the server."""
+        if not default_password:
+            raise HTTPException(status_code=404)
+        ip = request.client.host if request.client else "unknown"
+        now = time.time()
+        recent = [t for t in failed.get(ip, []) if now - t < FAILED_WINDOW]
+        failed[ip] = recent
+        if len(recent) >= MAX_FAILED_LOGINS:
+            raise HTTPException(status_code=429, detail="Too many wrong attempts. Try again in 15 minutes.")
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=400, detail="Invalid request")
+        email = str(body.get("email", "")).strip().lower()
+        password = str(body.get("password", ""))
+        if not EMAIL.match(email):
+            raise HTTPException(status_code=422, detail="Enter a valid email address.")
+        if not hmac.compare_digest(password.encode(), default_password.encode()):
+            failed[ip].append(now)
+            with db() as conn:
+                log_event(conn, request, "denied", None, email, "password")
+            raise HTTPException(status_code=401, detail="Wrong email or password.")
+        if not is_allowed(email):
+            with db() as conn:
+                log_event(conn, request, "denied", None, email, "password")
+            raise HTTPException(status_code=403, detail="This account is not allowed. Ask your teacher for access.")
+        failed.pop(ip, None)
+        sub = "pw:" + email
+        student = {"sub": sub, "email": email, "name": email.split("@")[0], "iat": int(now)}
+        with db() as conn:
+            conn.execute(
+                """INSERT INTO students (sub, email, name) VALUES (%s, %s, %s)
+                   ON CONFLICT (sub) DO UPDATE SET last_login = now()""",
+                (sub, email, student["name"]),
+            )
+            log_event(conn, request, "login", sub, email, "password")
+        request.session.clear()
+        request.session["student"] = student
+        return load_profile(sub)
 
     @app.get("/api/me")
     def me(request: Request):

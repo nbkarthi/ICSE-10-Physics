@@ -75,7 +75,7 @@ Implemented in `server/app.py`: Google Identity Services on `login.html` sends a
 
 - OAuth client: reuses the `GOOGLE_CLIENT_ID` from the sibling `ai_workspace/gr-proposal` project (copied into the gitignored `.env`; the client secret is not needed for ID-token sign-in and was not copied). Each new site origin (localhost, production URL) must be added to that client's Authorized JavaScript origins in Google Cloud Console.
 - `ALLOWED_EMAILS` / `ALLOWED_DOMAINS` restrict who may sign in; empty means any Google account.
-- Never commit `.env`, secrets, or service-account files. Never add passwords. Keep stored student data minimal (Google ID, email, name, progress); students are minors, so no trackers.
+- Never commit `.env`, secrets, or service-account files. Besides Google, the server supports one shared class password (`DEFAULT_PASSWORD` env var, off when empty): `POST /api/auth/password` takes email + that password, is rate limited (10 wrong tries per IP per 15 min), and creates a separate `pw:<email>` student. The password lives only in `.env` / host variables, never in the repo. Do not add per-student passwords or store password hashes without asking. Keep stored student data minimal (Google ID, email, name, progress); students are minors, so no trackers.
 - The GitHub repo is public, so chapter source is readable by anyone. The login gate protects the served site, not the repo contents.
 
 ## Working in this repo

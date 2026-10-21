@@ -17,6 +17,11 @@ main{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--l
 p{margin:0}.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 h1{font-family:var(--font-display);font-size:1.8rem;line-height:1.1;margin:0}
 .sub{color:var(--muted)}#btn{min-height:44px}
+form{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:16px}
+.or{margin:0 0 4px}label{font-weight:700;font-size:14px}
+input{font:inherit;min-height:44px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+form button{font:inherit;font-weight:700;min-height:44px;margin-top:8px;border-radius:8px;border:0;background:var(--fg);color:var(--bg);cursor:pointer}
+input:focus-visible,form button:focus-visible{outline:3px solid #1d4ed8;outline-offset:2px}
 #msg{color:var(--err);min-height:1.4em;font-size:14px}
 </style>
 <script src="theme.js"></script>
@@ -26,6 +31,14 @@ h1{font-family:var(--font-display);font-size:1.8rem;line-height:1.1;margin:0}
   <div><p class="eyebrow">ICSE Class 10 · Physics</p><h1>Sign in to learn</h1></div>
   <p class="sub">Use your Gmail / Google account to open your chapters and save your progress.</p>
   <div id="btn"></div>
+  <form id="pwform" hidden novalidate>
+    <p class="sub or">or sign in with the class password</p>
+    <label for="em">Email</label>
+    <input id="em" type="email" autocomplete="username" required>
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password" required>
+    <button id="pwgo" type="submit">Sign in</button>
+  </form>
   <p id="msg" role="alert"></p>
 </main>
 <script>
@@ -43,7 +56,8 @@ async function onCredential(r){
 async function init(){
   try{
     var cfg=await (await fetch('/api/config')).json();
-    if(!cfg.googleClientId){fail('Sign-in is not set up yet.');return}
+    if(cfg.passwordLogin){document.getElementById('pwform').hidden=false}
+    if(!cfg.googleClientId){if(!cfg.passwordLogin)fail('Sign-in is not set up yet.');return}
     var tries=0;
     (function wait(){
       if(window.google&&google.accounts){
@@ -53,6 +67,18 @@ async function init(){
     })();
   }catch(e){fail('Sign-in needs the school server. Open this page from the school site.')}
 }
+document.getElementById('pwform').addEventListener('submit',async function(e){
+  e.preventDefault();msg.textContent='';
+  var go=document.getElementById('pwgo');go.disabled=true;
+  try{
+    var res=await fetch('/api/auth/password',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:document.getElementById('em').value,password:document.getElementById('pw').value})});
+    if(res.ok){location.replace('/');return}
+    var d=await res.json().catch(function(){return {}});
+    fail(d.detail||'Sign-in failed. Please try again.');
+  }catch(x){fail('Could not reach the server. Check your internet and try again.')}
+  go.disabled=false;
+});
 init();
 </script>
 </body>
