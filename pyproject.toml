@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Server for the ICSE Class 10 Physics interactive book: Google sign-in, gated chapters, student progress"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.13",
+    "sqlalchemy>=2.0",
     "fastapi>=0.115",
     "google-auth>=2.30",
     "itsdangerous>=2.2",

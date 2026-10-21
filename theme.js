@@ -1,4 +1,4 @@
-/* Light / Dark switch shown at the top right of every page.
+/* Light / Dark switch shown at the top right of every page, plus a Dashboard link at the top left of lessons.
    Loaded in <head>: applies the saved choice before the page paints (no flash), then adds the switch.
    Without a saved choice the page follows the device setting. Pages must define their colour tokens for
    :root[data-theme="light"|"dark"] (see CLAUDE.md). */
@@ -16,6 +16,10 @@
     +'background:transparent;color:var(--fg,#14202e);cursor:pointer}'
     +'.theme-switch button[aria-pressed="true"]{background:var(--fg,#14202e);color:var(--bg,#fff)}'
     +'.theme-switch button:focus-visible{outline:3px solid var(--accent,#1d4ed8);outline-offset:-3px}'
+    +'.back-link{position:absolute;top:max(10px,env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));z-index:50;display:inline-flex;align-items:center;'
+    +'min-height:44px;padding:0 14px;border:1px solid var(--line,#d3dce6);border-radius:10px;background:var(--panel,#fff);color:var(--fg,#14202e);'
+    +'font:600 14px/1 var(--font-body,system-ui,sans-serif);text-decoration:none}'
+    +'.back-link:hover{border-color:var(--accent,#1d4ed8)}.back-link:focus-visible{outline:3px solid var(--accent,#1d4ed8);outline-offset:2px}'
     +'html body{padding-top:max(64px,calc(env(safe-area-inset-top,0px) + 64px))}';
 
   function build(){
@@ -36,6 +40,12 @@
     sync();
     if(window.matchMedia)try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',sync)}catch(e){}
     document.body.insertBefore(box,document.body.firstChild);
+    // Lessons get a way back to the dashboard.
+    if(/chapter-\d{2}-/.test(location.pathname)){
+      var back=document.createElement('a');back.className='back-link';back.href='index.html';back.textContent='\u2190 Dashboard';
+      var wrap=document.createElement('nav');wrap.setAttribute('aria-label','Back to dashboard');wrap.appendChild(back);
+      document.body.insertBefore(wrap,document.body.firstChild);
+    }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',build);else build();
 })();

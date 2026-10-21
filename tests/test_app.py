@@ -32,6 +32,7 @@ def fresh_schema(monkeypatch):
         conn.execute(f"DROP SCHEMA IF EXISTS {TEST_SCHEMA} CASCADE")
     monkeypatch.setenv("DATABASE_URL", DB_URL)
     monkeypatch.setenv("DB_SCHEMA", TEST_SCHEMA)
+    monkeypatch.setenv("AUTO_MIGRATE", "1")
     yield
     with psycopg.connect(DB_URL, autocommit=True) as conn:
         conn.execute(f"DROP SCHEMA IF EXISTS {TEST_SCHEMA} CASCADE")
@@ -278,3 +279,26 @@ def test_password_login_rate_limited(client, monkeypatch):
         assert pw_login(c, password="wrong").status_code == 401
     assert pw_login(c, password="wrong").status_code == 429
     assert pw_login(c).status_code == 429  # even the right password waits out the lockout
+
+
+def test_migrations_idempotent_and_versioned():
+    from server.migrate import run_migrations
+
+    run_migrations()
+    run_migrations()  # running again changes nothing
+    assert rows("SELECT version_num FROM alembic_version") == [("0001",)]
+    tables = {r[0] for r in rows("SELECT table_name FROM information_schema.tables WHERE table_schema = 'icse_physics_test'")}
+    assert {"students", "login_events", "study_days", "progress", "alembic_version"} <= tables
+
+
+def test_migration_adopts_existing_unversioned_schema():
+    """A database created by the old startup code (tables, no alembic_version) is adopted without data loss."""
+    from server.migrate import run_migrations
+
+    with psycopg.connect(DB_URL, autocommit=True) as conn:
+        conn.execute(f"CREATE SCHEMA {TEST_SCHEMA}")
+        conn.execute(f"CREATE TABLE {TEST_SCHEMA}.students (sub TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), last_login TIMESTAMPTZ NOT NULL DEFAULT now())")
+        conn.execute(f"INSERT INTO {TEST_SCHEMA}.students (sub, email, name) VALUES ('old', 'old@x.org', 'Old')")
+    run_migrations()
+    assert rows("SELECT sub, full_name FROM students") == [("old", None)]
+    assert rows("SELECT version_num FROM alembic_version") == [("0001",)]

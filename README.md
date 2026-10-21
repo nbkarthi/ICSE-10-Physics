@@ -15,7 +15,8 @@ Chapters available so far: **1. Force** and **4. Refraction of Light at Plane Su
 | `server/app.py` | FastAPI server: sign-in, page protection, progress, streaks |
 | `tests/` | Server tests |
 | `scripts/audit_a11y.py` | Accessibility and phone-layout check |
-| `railway.json` | Start command for deploying on Railway |
+| `migrations/`, `alembic.ini` | Alembic database migrations |
+| `Dockerfile`, `railway.json` | Production image and Railway release settings |
 | `CLAUDE.md` | Project conventions (read before adding a chapter) |
 
 ## Run it locally
@@ -37,7 +38,7 @@ Open `index.html` in a browser. The dashboard and chapters work, with no sign-in
 pg_isready
 ```
 
-It should say "accepting connections". The app creates its own schema (`icse_physics`) and tables on first start, so it does not touch other tables in the same database.
+It should say "accepting connections". The tables live in their own schema (`icse_physics`) and are created by Alembic migrations, so nothing else in the same database is touched. With `AUTO_MIGRATE=1` (set in `.env.example`) the server runs them when it starts. You can also run them yourself: `uv run --env-file .env alembic upgrade head`.
 
 **2. Create your `.env`**
 
@@ -53,6 +54,7 @@ Then fill it in:
 | `SESSION_SECRET` | A long random string: `python3 -c "import secrets;print(secrets.token_urlsafe(48))"` |
 | `DATABASE_URL` | For example `postgresql://localhost/railway` |
 | `DB_SCHEMA` | `icse_physics` (default) |
+| `AUTO_MIGRATE` | `1` locally to run migrations at startup. Leave unset in production |
 | `SESSION_HOURS` | `24` (students sign in again after this long) |
 | `COOKIE_SECURE` | `0` locally, `1` when served over HTTPS |
 | `DEFAULT_PASSWORD` | Optional shared class password. Students then sign in with email + this password on the login page. Empty turns it off |
@@ -101,7 +103,8 @@ If Playwright's browser is not installed, set `CHROMIUM_PATH` to a Chromium bina
 
 The server runs on any host that runs Python and has Postgres (the repo includes a `railway.json` for Railway). On the host:
 
-1. Set the same variables as in `.env`, with `DATABASE_URL` pointing at the host's Postgres and `COOKIE_SECURE=1`.
+1. Set the same variables as in `.env`, with `DATABASE_URL` pointing at the host's Postgres, `COOKIE_SECURE=1`, and no `AUTO_MIGRATE`.
+   Build from the `Dockerfile` and run `uv run alembic upgrade head` before each start (`railway.json` does this on Railway).
 2. Add the site's public address to **Authorized JavaScript origins** in Google Cloud Console.
 
 GitHub Pages can show the static dashboard in guest mode, but it cannot run the server, so sign-in does not work there.

@@ -19,6 +19,8 @@ from google.oauth2 import id_token as google_id_token
 from psycopg.rows import dict_row
 from starlette.middleware.sessions import SessionMiddleware
 
+from server.migrate import run_migrations
+
 ROOT = Path(__file__).resolve().parent.parent
 CHAPTER_COUNT = 12
 EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s]{2,}$")
@@ -85,32 +87,10 @@ def create_app(verify=verify_google_credential) -> FastAPI:
         # Used as a context manager: commits on success, rolls back on error, then closes.
         return psycopg.connect(db_url, row_factory=dict_row, options=f"-c search_path={schema}")
 
-    with psycopg.connect(db_url) as conn:
-        conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
-    with db() as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS students (
-              sub TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT NOT NULL,
-              created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-              last_login TIMESTAMPTZ NOT NULL DEFAULT now());
-            ALTER TABLE students ADD COLUMN IF NOT EXISTS full_name TEXT;
-            ALTER TABLE students ADD COLUMN IF NOT EXISTS school TEXT;
-            ALTER TABLE students ADD COLUMN IF NOT EXISTS profile_completed_at TIMESTAMPTZ;
-            CREATE TABLE IF NOT EXISTS login_events (
-              id BIGSERIAL PRIMARY KEY, sub TEXT, email TEXT,
-              event TEXT NOT NULL CHECK (event IN ('login', 'logout', 'denied')),
-              at TIMESTAMPTZ NOT NULL DEFAULT now(), ip TEXT, user_agent TEXT);
-            ALTER TABLE login_events ADD COLUMN IF NOT EXISTS method TEXT;
-            CREATE INDEX IF NOT EXISTS login_events_sub_at ON login_events (sub, at DESC);
-            CREATE TABLE IF NOT EXISTS study_days (
-              sub TEXT NOT NULL REFERENCES students(sub), day DATE NOT NULL,
-              PRIMARY KEY (sub, day));
-            CREATE TABLE IF NOT EXISTS progress (
-              sub TEXT NOT NULL REFERENCES students(sub), chapter INTEGER NOT NULL,
-              PRIMARY KEY (sub, chapter));
-            """
-        )
+    # Tables are created by Alembic migrations (migrations/). Production runs `alembic upgrade head` as a
+    # release step before the app boots. Locally set AUTO_MIGRATE=1 to run them on startup.
+    if os.environ.get("AUTO_MIGRATE") == "1":
+        run_migrations()
 
     def log_event(conn, request: Request, event: str, sub: str | None, email: str | None, method: str = "google") -> None:
         ip = request.client.host if request.client else None

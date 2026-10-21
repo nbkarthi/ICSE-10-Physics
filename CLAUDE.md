@@ -28,7 +28,8 @@ Check chapter numbers/titles against the syllabus before naming a file; do not i
 Chapters are plain static HTML. A small FastAPI server (`server/app.py`) adds Google sign-in, gated pages and per-student progress (Postgres). Python is managed with `uv`.
 
 Commands:
-- Needs a local Postgres (same one as `ai_workspace/gr-proposal`, `postgresql://localhost/railway`). Tables live in their own schema `icse_physics`, created automatically at startup; tests use a throwaway `icse_physics_test` schema.
+- Needs a local Postgres (same one as `ai_workspace/gr-proposal`, `postgresql://localhost/railway`). Tables live in their own schema `icse_physics`, created and versioned by Alembic migrations (`migrations/`, same approach as GR-proposal), including the `alembic_version` table. Locally `AUTO_MIGRATE=1` runs them at server start; in production they run as a release step (`uv run alembic upgrade head`, set as `preDeployCommand` in `railway.json`). Tests use a throwaway `icse_physics_test` schema.
+- Schema change: add a new file under `migrations/versions/` (next revision id, `down_revision` = previous), make it safe to re-run, add a test, run `uv run alembic upgrade head`. Never edit an applied migration.
 - Run tests: `uv run pytest -q` (single test: `uv run pytest tests/test_app.py::test_progress`)
 - Run locally: `uv run --env-file .env uvicorn server.app:create_app --factory --port 8000` (copy `.env.example` to `.env` first)
 
@@ -38,7 +39,7 @@ Existing files:
 - `chapter-04-refraction-plane-surfaces.html`: Chapter 4 lesson (replaces the old `bending-light.html` simulator).
 - `index.html`: student dashboard listing all 12 chapters. When a chapter is finished, set its `href` in the `CHAPTERS` array there.
 - `login.html`: Google sign-in page (public). `profile.html`: first-login details (full name, optional school).
-- `server/app.py`, `tests/test_app.py`, `pyproject.toml`, `.env.example`: server, tests, config.
+- `server/app.py`, `server/migrate.py`, `migrations/`, `alembic.ini`, `tests/test_app.py`, `pyproject.toml`, `.env.example`: server, migrations, tests, config. `Dockerfile` builds the production image.
 - `theme.js`: shared Light/Dark switch (served publicly by the server).
 - `scripts/audit_a11y.py`: accessibility/phone audit (see Conventions).
 - `README.md`: placeholder.

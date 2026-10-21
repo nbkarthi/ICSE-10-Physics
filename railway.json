@@ -1,7 +1,8 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
+  "build": { "builder": "DOCKERFILE", "dockerfilePath": "Dockerfile" },
   "deploy": {
-    "startCommand": "uvicorn server.app:create_app --factory --host 0.0.0.0 --port $PORT",
+    "preDeployCommand": ["uv run --no-sync alembic upgrade head"],
     "healthcheckPath": "/login.html",
     "restartPolicyType": "ON_FAILURE"
   }
