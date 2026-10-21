@@ -44,6 +44,7 @@ a.btn,button{font:inherit;font-weight:700;font-size:14px;min-height:44px;padding
   background:var(--accent);color:var(--accent-fg);text-decoration:none;display:inline-flex;align-items:center;cursor:pointer}
 button.ghost{background:transparent;color:var(--accent)}
 a.btn:focus-visible,button:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+#who a{color:var(--accent);font-weight:700}
 .note{color:var(--muted);font-size:14px;margin:0}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
 </style>
@@ -59,6 +60,7 @@ a.btn:focus-visible,button:focus-visible{outline:3px solid var(--fg);outline-off
       <b id="pcount">0 of 12 chapters done</b>
       <div class="bar" role="progressbar" aria-label="Chapters completed" aria-valuemin="0" aria-valuemax="12" aria-valuenow="0" id="pbar"><i id="pfill"></i></div>
       <small id="pavail">2 chapters open</small>
+      <small id="who" hidden><span id="whoname"></span> · <a href="#" id="signout">Sign out</a></small>
     </div>
   </header>
 
@@ -67,7 +69,7 @@ a.btn:focus-visible,button:focus-visible{outline:3px solid var(--fg);outline-off
     <ol class="grid" id="grid"></ol>
   </section>
 
-  <p class="note">Progress is saved in this browser only. Google sign-in will be added so it follows you across devices.</p>
+  <p class="note" id="note">Progress is saved in this browser only.</p>
 </div>
 
 <script>
@@ -90,6 +92,8 @@ var KEY='icse10-physics-done';
 function load(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return []}}
 function save(a){try{localStorage.setItem(KEY,JSON.stringify(a))}catch(e){}}
 var done=load();
+var signedIn=false;
+function saveAll(a){save(a);if(signedIn){fetch('/api/progress',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({done:a})}).catch(function(){})}}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 function render(){
   var g=document.getElementById('grid');g.textContent='';
@@ -110,7 +114,7 @@ function render(){
       var b=el('button','ghost',isDone?'Mark not done':'Mark as done');
       b.type='button';b.addEventListener('click',function(){
         var i=done.indexOf(c.n);if(i>-1)done.splice(i,1);else done.push(c.n);
-        save(done);render();
+        saveAll(done);render();
       });
       a.appendChild(b);li.appendChild(a);
     }
@@ -122,4 +126,22 @@ function render(){
   document.getElementById('pavail').textContent=open+' of 12 chapters open';
 }
 render();
+// With the school server: require sign-in and sync progress. On a plain static host /api/me is a 404, so stay in guest mode.
+fetch('/api/me').then(function(r){
+  if(r.status===401){location.replace('/login.html');return}
+  if(!r.ok)return;
+  return r.json().then(function(me){
+    signedIn=true;
+    document.getElementById('whoname').textContent=me.name;
+    document.getElementById('who').hidden=false;
+    document.getElementById('note').textContent='Signed in as '+me.email+'. Your progress is saved to your account.';
+    return fetch('/api/progress').then(function(p){return p.json()}).then(function(p){
+      done=p.done;save(done);render();
+    });
+  });
+}).catch(function(){});
+document.getElementById('signout').addEventListener('click',function(e){
+  e.preventDefault();
+  fetch('/api/logout',{method:'POST'}).finally(function(){try{localStorage.removeItem(KEY)}catch(x){};location.replace('/login.html')});
+});
 </script>

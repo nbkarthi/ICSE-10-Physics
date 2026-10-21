@@ -25,11 +25,20 @@ Check chapter numbers/titles against the syllabus before naming a file; do not i
 
 ## Current state
 
-Early stage. The repo is plain static files with no build system, package manager, linter or test suite, so there are no build/lint/test commands yet. Existing files:
+Chapters are plain static HTML. A small FastAPI server (`server/app.py`) adds Google sign-in, gated pages and per-student progress (Postgres). Python is managed with `uv`.
+
+Commands:
+- Needs a local Postgres (same one as `ai_workspace/gr-proposal`, `postgresql://localhost/railway`). Tables live in their own schema `icse_physics`, created automatically at startup; tests use a throwaway `icse_physics_test` schema.
+- Run tests: `uv run pytest -q` (single test: `uv run pytest tests/test_app.py::test_progress`)
+- Run locally: `uv run --env-file .env uvicorn server.app:create_app --factory --port 8000` (copy `.env.example` to `.env` first)
+
+Existing files:
 
 - `chapter-01-force.html`: Chapter 1 lesson.
 - `chapter-04-refraction-plane-surfaces.html`: Chapter 4 lesson (replaces the old `bending-light.html` simulator).
 - `index.html`: student dashboard listing all 12 chapters. When a chapter is finished, set its `href` in the `CHAPTERS` array there.
+- `login.html`: Google sign-in page (public).
+- `server/app.py`, `tests/test_app.py`, `pyproject.toml`, `.env.example`: server, tests, config.
 - `README.md`: placeholder.
 
 Update this section whenever tooling, directory layout or the auth backend is added (including how to run a single test, if tests are added).
@@ -53,21 +62,18 @@ Update this section whenever tooling, directory layout or the auth backend is ad
 - Interactive controls must be keyboard-operable and have visible focus; do not rely on colour alone to convey meaning.
 - Must work on a phone, since students will often use one. Touch targets at least 44px.
 
-## Authentication and student access (planned)
+## Authentication and student access
 
-Students log in with Google (Gmail) and only then see the chapter list and lessons. This is not implemented yet; the backend has not been chosen. Before building it, confirm the choice with the user (candidates: Firebase Authentication with Google provider, or Google Identity Services plus a small backend).
+Implemented in `server/app.py`: Google Identity Services on `login.html` sends an ID token to `POST /api/auth/google`; the server verifies it (signature, expiry, audience, `email_verified`) and sets a signed, HttpOnly session cookie. `/` and `chapter-NN-*.html` redirect to `/login.html` without a session. Only allowlisted filenames are served, never arbitrary paths. `GET/PUT /api/progress` stores completed chapters per student. Sessions expire a fixed `SESSION_HOURS` (default 24) after sign-in, enforced server-side. Logins, logouts and denied attempts are recorded in `login_events`. `index.html` falls back to guest mode (localStorage) when `/api/me` is absent, e.g. on GitHub Pages.
 
-Rules whenever this is built:
-- Use Google Sign-In (OAuth/OIDC) only; never collect or store passwords.
-- Access control must be enforced server-side (or by the auth provider's rules), not just by hiding UI in client JS. Static HTML in a public repo or public URL is readable by anyone, so decide where gated chapter content is served from before assuming login protects it.
-- Verify Google ID tokens on the server. Never trust an email or name sent from the client.
-- Store the minimum student data needed (Google ID/email, name, progress). These are minors: avoid unnecessary personal data, no third-party trackers or ads, and keep a note of what is stored.
-- No secrets, API keys with write access, or service-account files in the repo. Public client IDs are fine; keep everything else in environment variables or the hosting provider's secret store.
-- Plan for progress tracking (chapters completed, quiz scores) keyed to the signed-in user, and a sign-out control on every page.
-- Restricting access to an allowlist of emails or a school domain is a possible requirement; ask before assuming open sign-in for any Google account.
+- OAuth client: reuses the `GOOGLE_CLIENT_ID` from the sibling `ai_workspace/gr-proposal` project (copied into the gitignored `.env`; the client secret is not needed for ID-token sign-in and was not copied). Each new site origin (localhost, production URL) must be added to that client's Authorized JavaScript origins in Google Cloud Console.
+- `ALLOWED_EMAILS` / `ALLOWED_DOMAINS` restrict who may sign in; empty means any Google account.
+- Never commit `.env`, secrets, or service-account files. Never add passwords. Keep stored student data minimal (Google ID, email, name, progress); students are minors, so no trackers.
+- The GitHub repo is public, so chapter source is readable by anyone. The login gate protects the served site, not the repo contents.
 
 ## Working in this repo
 
 - Ask before large structural decisions (framework, hosting, auth provider). Until decided, keep chapters as plain static HTML so they stay portable.
 - Do not rewrite or restyle existing chapters unless asked; make targeted edits.
+- Tests: if a change touches server-side code (`server/`, `tests/`, `pyproject.toml`, or DB/auth behaviour), run `uv run pytest -q` before pushing, and only then. Do not run tests on every edit, and skip them for changes limited to static HTML/docs. Never push with failing tests.
 - Commit only when asked. Commit messages: short imperative summary, e.g. "Add Chapter 2 Work, Energy and Power".

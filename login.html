@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sign in · ICSE Physics</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Nunito+Sans:wght@400;600;700&display=swap">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+:root{--bg:#f2f5f9;--panel:#fff;--fg:#14202e;--muted:#566779;--line:#d3dce6;--err:#b42318;
+  --font-display:'Bricolage Grotesque',system-ui,sans-serif;--font-body:'Nunito Sans',system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1621;--panel:#162231;--fg:#e7eef6;--muted:#9db0c4;--line:#2a3b4e;--err:#ff8a80;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font-family:var(--font-body);padding:24px 16px}
+main{width:100%;max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:28px 24px;display:flex;flex-direction:column;gap:16px}
+p{margin:0}.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--font-display);font-size:1.8rem;line-height:1.1;margin:0}
+.sub{color:var(--muted)}#btn{min-height:44px}
+#msg{color:var(--err);min-height:1.4em;font-size:14px}
+</style>
+</head>
+<body>
+<main>
+  <div><p class="eyebrow">ICSE Class 10 · Physics</p><h1>Sign in to learn</h1></div>
+  <p class="sub">Use your Gmail / Google account to open your chapters and save your progress.</p>
+  <div id="btn"></div>
+  <p id="msg" role="alert"></p>
+</main>
+<script>
+var msg=document.getElementById('msg');
+function fail(t){msg.textContent=t}
+async function onCredential(r){
+  msg.textContent='';
+  try{
+    var res=await fetch('/api/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:r.credential})});
+    var data=await res.json().catch(function(){return {}});
+    if(res.ok){location.replace('/');return}
+    fail(data.detail||'Sign-in failed. Please try again.');
+  }catch(e){fail('Could not reach the server. Check your internet and try again.')}
+}
+async function init(){
+  try{
+    var cfg=await (await fetch('/api/config')).json();
+    if(!cfg.googleClientId){fail('Sign-in is not set up yet.');return}
+    var tries=0;
+    (function wait(){
+      if(window.google&&google.accounts){
+        google.accounts.id.initialize({client_id:cfg.googleClientId,callback:onCredential});
+        google.accounts.id.renderButton(document.getElementById('btn'),{theme:'outline',size:'large',text:'signin_with',width:300});
+      }else if(++tries<50){setTimeout(wait,100)}else{fail('Google sign-in could not load.')}
+    })();
+  }catch(e){fail('Sign-in needs the school server. Open this page from the school site.')}
+}
+init();
+</script>
+</body>
+</html>

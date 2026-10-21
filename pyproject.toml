@@ -1,0 +1,20 @@
+[project]
+name = "icse-10-physics"
+version = "0.1.0"
+description = "Server for the ICSE Class 10 Physics interactive book: Google sign-in, gated chapters, student progress"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "google-auth>=2.30",
+    "itsdangerous>=2.2",
+    "psycopg[binary]>=3.2",
+    "requests>=2.32",
+    "uvicorn>=0.30",
+]
+
+[dependency-groups]
+dev = ["httpx>=0.27", "pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
