@@ -39,6 +39,7 @@ Existing files:
 - `index.html`: student dashboard listing all 12 chapters. When a chapter is finished, set its `href` in the `CHAPTERS` array there.
 - `login.html`: Google sign-in page (public). `profile.html`: first-login details (full name, optional school).
 - `server/app.py`, `tests/test_app.py`, `pyproject.toml`, `.env.example`: server, tests, config.
+- `theme.js`: shared Light/Dark switch (served publicly by the server).
 - `scripts/audit_a11y.py`: accessibility/phone audit (see Conventions).
 - `README.md`: placeholder.
 
@@ -58,6 +59,10 @@ Update this section whenever tooling, directory layout or the auth backend is ad
 - Keep terminology identical to the ICSE textbook (e.g. "angle of incidence", "critical angle", "moment of a force") so students can map the app to their book and exams.
 - Practice questions should mirror ICSE exam style (short answer, numericals, reasoning) and include worked answers.
 - Simulations must not be misleading: label approximations (e.g. ideal conditions, ignored friction) clearly.
+
+### Light/dark theme
+- Every page includes `<script src="theme.js"></script>` at the end of `<head>`. It adds a Light/Dark switch at the top right and remembers the student's choice (localStorage `icse10-theme`); with no choice saved the page follows the device setting.
+- Pages must define colour tokens on bare `:root` (light), then redefine them under `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){...}}` and `:root[data-theme="dark"]{...}`, and style everything through the tokens. Use the token names `--bg --panel --fg --line --accent` so the switch matches the page.
 
 ### Accessibility and usability
 - Run `scripts/audit_a11y.py` on every new or changed page. Target: zero axe violations, no horizontal scroll at 375px, controls at least 44px, one `<main>` landmark, `lang` on `<html>`, scrollable regions focusable and labelled.

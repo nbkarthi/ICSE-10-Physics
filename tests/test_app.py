@@ -224,3 +224,8 @@ def test_streak_and_badges(monkeypatch, client):
 
 def test_streak_requires_login(client):
     assert client.get("/api/streak").status_code == 401
+
+
+def test_theme_script_public(client):
+    r = client.get("/theme.js")
+    assert r.status_code == 200 and "data-theme" in r.text

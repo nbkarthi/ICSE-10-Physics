@@ -294,6 +294,10 @@ def create_app(verify=verify_google_credential) -> FastAPI:
     def home(request: Request):
         return page(request, "index.html")
 
+    @app.get("/theme.js")
+    def theme_script():
+        return FileResponse(ROOT / "theme.js", media_type="text/javascript")
+
     @app.get("/{name}")
     def named_page(request: Request, name: str):
         return page(request, name)
