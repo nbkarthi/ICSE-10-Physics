@@ -5,7 +5,10 @@ Run:  uv run --env-file .env uvicorn server.app:create_app --factory --port 8000
 import os
 import re
 import time
+from datetime import date, datetime, timedelta
 from pathlib import Path
+
+from zoneinfo import ZoneInfo
 
 import psycopg
 from fastapi import FastAPI, HTTPException, Request
@@ -18,6 +21,7 @@ from starlette.middleware.sessions import SessionMiddleware
 ROOT = Path(__file__).resolve().parent.parent
 CHAPTER_COUNT = 12
 SCHEMA_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+CHAPTER_PAGE = re.compile(r"^chapter-\d{2}-[a-z0-9-]+\.html$")
 GATED_PAGE = re.compile(r"^(index|chapter-\d{2}-[a-z0-9-]+)\.html$")
 
 
@@ -30,6 +34,32 @@ def verify_google_credential(credential: str, client_id: str) -> dict:
     return google_id_token.verify_oauth2_token(credential, google_requests.Request(), client_id)
 
 
+def streaks(days: list[date], today: date) -> tuple[int, int]:
+    """Return (current, longest) run of consecutive study days. A streak stays alive until the end of the next day."""
+    ds = sorted(set(days))
+    longest = run = 0
+    prev = None
+    for d in ds:
+        run = run + 1 if prev and d - prev == timedelta(days=1) else 1
+        longest = max(longest, run)
+        prev = d
+    current = 0
+    if ds and today - ds[-1] <= timedelta(days=1):
+        current = run
+    return current, longest
+
+
+BADGES = [
+    ("first-steps", "First steps", "Open your first chapter", lambda c, l, n, d: d >= 1),
+    ("chapter-done", "Chapter complete", "Finish one chapter", lambda c, l, n, d: n >= 1),
+    ("halfway", "Halfway there", "Finish 6 chapters", lambda c, l, n, d: n >= 6),
+    ("physics-pro", "Physics pro", "Finish all 12 chapters", lambda c, l, n, d: n >= 12),
+    ("streak-3", "3-day streak", "Study 3 days in a row", lambda c, l, n, d: l >= 3),
+    ("streak-7", "7-day streak", "Study 7 days in a row", lambda c, l, n, d: l >= 7),
+    ("streak-30", "30-day streak", "Study 30 days in a row", lambda c, l, n, d: l >= 30),
+]
+
+
 def create_app(verify=verify_google_credential) -> FastAPI:
     client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
     secret = os.environ.get("SESSION_SECRET", "")
@@ -39,6 +69,7 @@ def create_app(verify=verify_google_credential) -> FastAPI:
     db_url = os.environ.get("DATABASE_URL", "")
     schema = os.environ.get("DB_SCHEMA", "icse_physics")
     session_seconds = int(float(os.environ.get("SESSION_HOURS", "24")) * 3600)
+    tz = ZoneInfo(os.environ.get("STUDY_TIMEZONE", "Asia/Kolkata"))
     if not db_url:
         raise RuntimeError("DATABASE_URL must be set (Postgres)")
     if not SCHEMA_NAME.match(schema):
@@ -58,11 +89,17 @@ def create_app(verify=verify_google_credential) -> FastAPI:
               sub TEXT PRIMARY KEY, email TEXT NOT NULL, name TEXT NOT NULL,
               created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
               last_login TIMESTAMPTZ NOT NULL DEFAULT now());
+            ALTER TABLE students ADD COLUMN IF NOT EXISTS full_name TEXT;
+            ALTER TABLE students ADD COLUMN IF NOT EXISTS school TEXT;
+            ALTER TABLE students ADD COLUMN IF NOT EXISTS profile_completed_at TIMESTAMPTZ;
             CREATE TABLE IF NOT EXISTS login_events (
               id BIGSERIAL PRIMARY KEY, sub TEXT, email TEXT,
               event TEXT NOT NULL CHECK (event IN ('login', 'logout', 'denied')),
               at TIMESTAMPTZ NOT NULL DEFAULT now(), ip TEXT, user_agent TEXT);
             CREATE INDEX IF NOT EXISTS login_events_sub_at ON login_events (sub, at DESC);
+            CREATE TABLE IF NOT EXISTS study_days (
+              sub TEXT NOT NULL REFERENCES students(sub), day DATE NOT NULL,
+              PRIMARY KEY (sub, day));
             CREATE TABLE IF NOT EXISTS progress (
               sub TEXT NOT NULL REFERENCES students(sub), chapter INTEGER NOT NULL,
               PRIMARY KEY (sub, chapter));
@@ -136,10 +173,63 @@ def create_app(verify=verify_google_credential) -> FastAPI:
         request.session["student"] = student
         return {"email": email, "name": student["name"]}
 
+    def load_profile(sub: str) -> dict:
+        with db() as conn:
+            row = conn.execute(
+                "SELECT name, email, full_name, school, profile_completed_at FROM students WHERE sub = %s", (sub,)
+            ).fetchone()
+        if not row:
+            return {"profileComplete": False}
+        return {
+            "email": row["email"],
+            "name": row["full_name"] or row["name"],
+            "fullName": row["full_name"] or "",
+            "school": row["school"] or "",
+            "profileComplete": row["profile_completed_at"] is not None,
+        }
+
     @app.get("/api/me")
     def me(request: Request):
+        return load_profile(require_student(request)["sub"])
+
+    @app.put("/api/profile")
+    async def put_profile(request: Request):
         s = require_student(request)
-        return {"email": s["email"], "name": s["name"]}
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise HTTPException(status_code=422, detail="Invalid profile")
+        full_name = " ".join(str(body.get("fullName", "")).split())
+        school = " ".join(str(body.get("school", "")).split())
+        if not 2 <= len(full_name) <= 80 or not full_name.replace(" ", "").isprintable():
+            raise HTTPException(status_code=422, detail="Enter your full name (2 to 80 characters).")
+        if len(school) > 100 or not (school.replace(" ", "") or "x").isprintable():
+            raise HTTPException(status_code=422, detail="School name is too long (100 characters at most).")
+        with db() as conn:
+            conn.execute(
+                """UPDATE students SET full_name = %s, school = %s,
+                   profile_completed_at = COALESCE(profile_completed_at, now()) WHERE sub = %s""",
+                (full_name, school or None, s["sub"]),
+            )
+        return load_profile(s["sub"])
+
+    def today() -> date:
+        return datetime.fromtimestamp(time.time(), tz).date()
+
+    @app.get("/api/streak")
+    def get_streak(request: Request):
+        sub = require_student(request)["sub"]
+        with db() as conn:
+            days = [r["day"] for r in conn.execute("SELECT day FROM study_days WHERE sub = %s", (sub,)).fetchall()]
+            done = conn.execute("SELECT count(*) AS n FROM progress WHERE sub = %s", (sub,)).fetchone()["n"]
+        current, longest = streaks(days, today())
+        return {
+            "current": current,
+            "longest": longest,
+            "badges": [
+                {"id": i, "name": n, "description": d, "earned": bool(rule(current, longest, done, len(set(days))))}
+                for i, n, d, rule in BADGES
+            ],
+        }
 
     @app.post("/api/logout")
     def logout(request: Request):
@@ -176,6 +266,8 @@ def create_app(verify=verify_google_credential) -> FastAPI:
         """Serve an HTML page from the repo root. Only allowlisted names; never arbitrary paths."""
         if name == "login.html":
             gated = False
+        elif name == "profile.html":
+            gated = True
         elif GATED_PAGE.match(name):
             gated = True
         else:
@@ -183,8 +275,19 @@ def create_app(verify=verify_google_credential) -> FastAPI:
         path = ROOT / name
         if not path.is_file():
             raise HTTPException(status_code=404)
-        if gated and not current_student(request):
-            return RedirectResponse("/login.html", status_code=303)
+        if gated:
+            student = current_student(request)
+            if not student:
+                return RedirectResponse("/login.html", status_code=303)
+            # First sign-in: collect the student's basic details before showing any lesson.
+            if name != "profile.html" and not load_profile(student["sub"])["profileComplete"]:
+                return RedirectResponse("/profile.html", status_code=303)
+            if CHAPTER_PAGE.match(name):
+                with db() as conn:
+                    conn.execute(
+                        "INSERT INTO study_days (sub, day) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                        (student["sub"], today()),
+                    )
         return FileResponse(path, media_type="text/html", headers={"Cache-Control": "private, no-store"})
 
     @app.get("/")

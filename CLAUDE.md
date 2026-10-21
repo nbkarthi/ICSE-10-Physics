@@ -37,8 +37,9 @@ Existing files:
 - `chapter-01-force.html`: Chapter 1 lesson.
 - `chapter-04-refraction-plane-surfaces.html`: Chapter 4 lesson (replaces the old `bending-light.html` simulator).
 - `index.html`: student dashboard listing all 12 chapters. When a chapter is finished, set its `href` in the `CHAPTERS` array there.
-- `login.html`: Google sign-in page (public).
+- `login.html`: Google sign-in page (public). `profile.html`: first-login details (full name, optional school).
 - `server/app.py`, `tests/test_app.py`, `pyproject.toml`, `.env.example`: server, tests, config.
+- `scripts/audit_a11y.py`: accessibility/phone audit (see Conventions).
 - `README.md`: placeholder.
 
 Update this section whenever tooling, directory layout or the auth backend is added (including how to run a single test, if tests are added).
@@ -59,12 +60,13 @@ Update this section whenever tooling, directory layout or the auth backend is ad
 - Simulations must not be misleading: label approximations (e.g. ideal conditions, ignored friction) clearly.
 
 ### Accessibility and usability
+- Run `scripts/audit_a11y.py` on every new or changed page. Target: zero axe violations, no horizontal scroll at 375px, controls at least 44px, one `<main>` landmark, `lang` on `<html>`, scrollable regions focusable and labelled.
 - Interactive controls must be keyboard-operable and have visible focus; do not rely on colour alone to convey meaning.
 - Must work on a phone, since students will often use one. Touch targets at least 44px.
 
 ## Authentication and student access
 
-Implemented in `server/app.py`: Google Identity Services on `login.html` sends an ID token to `POST /api/auth/google`; the server verifies it (signature, expiry, audience, `email_verified`) and sets a signed, HttpOnly session cookie. `/` and `chapter-NN-*.html` redirect to `/login.html` without a session. Only allowlisted filenames are served, never arbitrary paths. `GET/PUT /api/progress` stores completed chapters per student. Sessions expire a fixed `SESSION_HOURS` (default 24) after sign-in, enforced server-side. Logins, logouts and denied attempts are recorded in `login_events`. `index.html` falls back to guest mode (localStorage) when `/api/me` is absent, e.g. on GitHub Pages.
+Implemented in `server/app.py`: Google Identity Services on `login.html` sends an ID token to `POST /api/auth/google`; the server verifies it (signature, expiry, audience, `email_verified`) and sets a signed, HttpOnly session cookie. `/` and `chapter-NN-*.html` redirect to `/login.html` without a session. Only allowlisted filenames are served, never arbitrary paths. `GET/PUT /api/progress` stores completed chapters per student. On first sign-in the student is redirected to `profile.html` to give a full name and optional school; gated pages stay locked until `profile_completed_at` is set. Collect no more than this (minors). Study streaks and badges: opening a `chapter-*.html` page records a study day (`study_days`, `STUDY_TIMEZONE`, default Asia/Kolkata); badges are computed in `server/app.py` (`BADGES`) and shown on the dashboard. Sessions expire a fixed `SESSION_HOURS` (default 24) after sign-in, enforced server-side. Logins, logouts and denied attempts are recorded in `login_events`. `index.html` falls back to guest mode (localStorage) when `/api/me` is absent, e.g. on GitHub Pages.
 
 - OAuth client: reuses the `GOOGLE_CLIENT_ID` from the sibling `ai_workspace/gr-proposal` project (copied into the gitignored `.env`; the client secret is not needed for ID-token sign-in and was not copied). Each new site origin (localhost, production URL) must be added to that client's Authorized JavaScript origins in Google Cloud Console.
 - `ALLOWED_EMAILS` / `ALLOWED_DOMAINS` restrict who may sign in; empty means any Google account.

@@ -42,13 +42,14 @@ svg.drag,svg.drag #handle{cursor:grabbing}
 .lab{font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
 .seg input{position:absolute;opacity:0;pointer-events:none}
-.seg label{border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:600;font-size:14px;background:var(--bg)}
+.seg label{display:inline-flex;align-items:center;min-height:44px;border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-weight:600;font-size:14px;background:var(--bg)}
 .seg input:checked+label{background:var(--accent);color:var(--bg);border-color:var(--accent)}
 .seg input:focus-visible+label{outline:2px solid var(--fg);outline-offset:2px}
-input[type=range]{width:100%;accent-color:var(--accent);height:28px}
+input[type=number]{min-height:44px}
+input[type=range]{width:100%;accent-color:var(--accent);height:44px}
 .big{font-family:var(--font-mono);font-size:1.5rem;font-weight:500}
 .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-button{font:inherit;font-weight:600;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:6px 12px;cursor:pointer}
+button{font:inherit;font-weight:600;font-size:14px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:6px 12px;min-height:44px;cursor:pointer}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
 .stat .v{font-family:var(--font-mono);font-size:1.25rem;font-weight:500;font-variant-numeric:tabular-nums}
@@ -74,14 +75,14 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </head>
 <body>
 
-<div class="wrap">
+<main class="wrap">
   <header>
     <h1>Bending Light</h1>
     <p class="sub">Refraction and total internal reflection. Drag the ray in the diagram, or use the slider, and watch what the ray does at the boundary.</p>
   </header>
 
   <div class="stage">
-    <svg id="svg" viewBox="0 0 600 420" role="img" aria-label="Ray diagram showing incident, reflected and refracted rays at an air and material boundary">
+    <svg id="svg" viewBox="0 0 600 420" role="group" aria-label="Ray diagram showing incident, reflected and refracted rays at an air and material boundary">
       <rect id="topFill" x="0" y="0" width="600" height="210" fill="var(--air)"/>
       <rect id="botFill" x="0" y="210" width="600" height="210" fill="var(--glass)"/>
       <line x1="0" y1="210" x2="600" y2="210" stroke="var(--fg)" stroke-width="1.5"/>
@@ -154,7 +155,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     </ol>
     <p class="sub" style="margin-top:10px">When light changes medium, its speed and wavelength change. Its frequency does not.</p>
   </div>
-</div>
+</main>
 
 <script>
 (function(){

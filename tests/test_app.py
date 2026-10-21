@@ -4,7 +4,9 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from server.app import create_app
+from datetime import date
+
+from server.app import create_app, streaks
 
 CLIENT_ID = "test-client.apps.googleusercontent.com"
 GOOD = {"sub": "123", "email": "Kid@Gmail.com", "email_verified": True, "name": "Kid One"}
@@ -53,6 +55,10 @@ def login(c, cred="good"):
     return c.post("/api/auth/google", json={"credential": cred})
 
 
+def complete_profile(c, name="Kid One Sharma", school="Demo School"):
+    return c.put("/api/profile", json={"fullName": name, "school": school})
+
+
 def test_requires_secret(monkeypatch):
     monkeypatch.setenv("SESSION_SECRET", "short")
     with pytest.raises(RuntimeError):
@@ -68,6 +74,7 @@ def test_pages_gated(client):
 
 def test_no_arbitrary_files(client):
     login(client)
+    complete_profile(client)
     for name in ["CLAUDE.md", ".env", "pyproject.toml", "server", "chapter-01-force.html.bak"]:
         assert client.get(f"/{name}").status_code == 404
     assert client.get("/%2e%2e/etc/passwd").status_code == 404
@@ -77,6 +84,8 @@ def test_login_flow_and_pages(client):
     r = login(client)
     assert r.status_code == 200 and r.json()["email"] == "kid@gmail.com"
     assert client.get("/api/me").json()["name"] == "Kid One"
+    complete_profile(client)
+    assert client.get("/api/me").json()["name"] == "Kid One Sharma"
     assert client.get("/").status_code == 200
     assert client.get("/chapter-01-force.html").status_code == 200
     client.post("/api/logout")
@@ -148,3 +157,70 @@ def test_schema_isolated(client):
     login(client)
     tables = rows("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('students','progress','login_events')")
     assert tables == []
+
+
+def test_first_login_collects_profile(client):
+    login(client)
+    me = client.get("/api/me").json()
+    assert me["profileComplete"] is False
+    for page in ["/", "/chapter-01-force.html"]:
+        r = client.get(page)
+        assert (r.status_code, r.headers["location"]) == (303, "/profile.html")
+    assert client.get("/profile.html").status_code == 200
+    r = complete_profile(client, "  Asha   Rao ", "")
+    assert r.status_code == 200 and r.json()["fullName"] == "Asha Rao" and r.json()["profileComplete"] is True
+    assert client.get("/").status_code == 200
+    # Profile persists across sessions.
+    client.post("/api/logout")
+    login(client)
+    assert client.get("/api/me").json()["name"] == "Asha Rao"
+    assert client.get("/").status_code == 200
+
+
+def test_profile_validation(client):
+    assert client.put("/api/profile", json={"fullName": "Asha"}).status_code == 401
+    assert client.get("/profile.html").status_code == 303
+    login(client)
+    for bad in [{"fullName": ""}, {"fullName": "A"}, {"fullName": "x" * 81}, {"fullName": "Asha", "school": "s" * 101}, []]:
+        assert client.put("/api/profile", json=bad).status_code == 422
+    assert client.get("/api/me").json()["profileComplete"] is False
+
+
+def test_streak_math():
+    d = lambda n: date(2026, 10, n)
+    assert streaks([], d(20)) == (0, 0)
+    assert streaks([d(18), d(19), d(20)], d(20)) == (3, 3)
+    assert streaks([d(18), d(19)], d(20)) == (2, 2)  # yesterday still counts
+    assert streaks([d(10), d(11), d(12), d(18)], d(20)) == (0, 3)  # broken, best kept
+    assert streaks([d(20), d(20)], d(20)) == (1, 1)
+
+
+def test_streak_and_badges(monkeypatch, client):
+    day = 86400
+    now = [1_792_000_000.0]
+    monkeypatch.setattr("server.app.time.time", lambda: now[0])
+    login(client)
+    complete_profile(client)
+    badges = lambda: {b["id"]: b["earned"] for b in client.get("/api/streak").json()["badges"]}
+    assert client.get("/api/streak").json()["current"] == 0 and not badges()["first-steps"]
+    client.get("/")  # dashboard visit is not a study day
+    assert client.get("/api/streak").json()["current"] == 0
+    for _ in range(3):
+        login(client)  # sessions last 24h, so a daily visitor signs in each day
+        assert client.get("/chapter-01-force.html").status_code == 200
+        client.get("/chapter-01-force.html")  # same day twice counts once
+        now[0] += day
+    login(client)
+    st = client.get("/api/streak").json()
+    assert (st["current"], st["longest"]) == (3, 3)
+    assert badges()["first-steps"] and badges()["streak-3"] and not badges()["streak-7"] and not badges()["chapter-done"]
+    client.put("/api/progress", json={"done": [1]})
+    assert badges()["chapter-done"]
+    now[0] += 3 * day  # miss days: current resets, best stays
+    login(client)
+    st = client.get("/api/streak").json()
+    assert (st["current"], st["longest"]) == (0, 3) and badges()["streak-3"]
+
+
+def test_streak_requires_login(client):
+    assert client.get("/api/streak").status_code == 401

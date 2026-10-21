@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ICSE Physics Dashboard</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Nunito+Sans:wght@400;600;700&display=swap">
 <style>
@@ -44,12 +49,21 @@ a.btn,button{font:inherit;font-weight:700;font-size:14px;min-height:44px;padding
   background:var(--accent);color:var(--accent-fg);text-decoration:none;display:inline-flex;align-items:center;cursor:pointer}
 button.ghost{background:transparent;color:var(--accent)}
 a.btn:focus-visible,button:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
-#who a{color:var(--accent);font-weight:700}
+.streak{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 20px;margin-bottom:12px}
+.streak p{margin:0}.big{font-family:var(--font-display);font-size:2.2rem;font-weight:700;line-height:1}
+.big small{font-size:1rem;font-weight:600;color:var(--muted)}.best{color:var(--muted);font-size:14px}
+.badges{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.badges li{border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--panel);min-width:0}
+.badges li b{display:block;font-size:14px}.badges li span{font-size:12px;color:var(--muted)}
+.badges li.on{border-color:var(--ok);background:var(--ok-bg)}.badges li.on b{color:var(--ok)}
+.badges li:not(.on){border-style:dashed}.badges li:not(.on) b{color:var(--muted)}
+#who a{color:var(--accent);font-weight:700;display:inline-block;padding:12px 8px;margin:-12px -8px}
 .note{color:var(--muted);font-size:14px;margin:0}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
 </style>
-
-<div class="wrap">
+</head>
+<body>
+<main class="wrap">
   <header>
     <div>
       <p class="eyebrow">ICSE Class 10 · Physics</p>
@@ -64,13 +78,22 @@ a.btn:focus-visible,button:focus-visible{outline:3px solid var(--fg);outline-off
     </div>
   </header>
 
+  <section aria-labelledby="st" id="streak" hidden>
+    <h2 id="st" style="margin-bottom:12px">Your streak</h2>
+    <div class="streak">
+      <p class="big"><span id="scur">0</span> <small>day streak</small></p>
+      <p class="best">Best: <span id="slong">0</span> days. Open a chapter each day to keep it going.</p>
+    </div>
+    <ul class="badges" id="badges" aria-label="Badges"></ul>
+  </section>
+
   <section aria-labelledby="ch">
     <h2 id="ch" style="margin-bottom:12px">Chapters</h2>
     <ol class="grid" id="grid"></ol>
   </section>
 
   <p class="note" id="note">Progress is saved in this browser only.</p>
-</div>
+</main>
 
 <script>
 // href is relative to this file. A chapter without href is shown as "Coming soon".
@@ -94,6 +117,21 @@ function save(a){try{localStorage.setItem(KEY,JSON.stringify(a))}catch(e){}}
 var done=load();
 var signedIn=false;
 function saveAll(a){save(a);if(signedIn){fetch('/api/progress',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({done:a})}).catch(function(){})}}
+function loadStreak(){
+  return fetch('/api/streak').then(function(r){return r.ok?r.json():null}).then(function(st){
+    if(!st)return;
+    document.getElementById('scur').textContent=st.current;
+    document.getElementById('slong').textContent=st.longest;
+    var ul=document.getElementById('badges');ul.textContent='';
+    st.badges.forEach(function(b){
+      var li=el('li',b.earned?'on':'');
+      li.appendChild(el('b',null,b.name+(b.earned?' (earned)':' (locked)')));
+      li.appendChild(el('span',null,b.description));
+      ul.appendChild(li);
+    });
+    document.getElementById('streak').hidden=false;
+  }).catch(function(){});
+}
 function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
 function render(){
   var g=document.getElementById('grid');g.textContent='';
@@ -114,7 +152,7 @@ function render(){
       var b=el('button','ghost',isDone?'Mark not done':'Mark as done');
       b.type='button';b.addEventListener('click',function(){
         var i=done.indexOf(c.n);if(i>-1)done.splice(i,1);else done.push(c.n);
-        saveAll(done);render();
+        saveAll(done);render();if(signedIn)setTimeout(loadStreak,400);
       });
       a.appendChild(b);li.appendChild(a);
     }
@@ -131,12 +169,14 @@ fetch('/api/me').then(function(r){
   if(r.status===401){location.replace('/login.html');return}
   if(!r.ok)return;
   return r.json().then(function(me){
+    if(!me.profileComplete){location.replace('/profile.html');return}
     signedIn=true;
     document.getElementById('whoname').textContent=me.name;
     document.getElementById('who').hidden=false;
     document.getElementById('note').textContent='Signed in as '+me.email+'. Your progress is saved to your account.';
     return fetch('/api/progress').then(function(p){return p.json()}).then(function(p){
       done=p.done;save(done);render();
+      return loadStreak();
     });
   });
 }).catch(function(){});
@@ -145,3 +185,5 @@ document.getElementById('signout').addEventListener('click',function(e){
   fetch('/api/logout',{method:'POST'}).finally(function(){try{localStorage.removeItem(KEY)}catch(x){};location.replace('/login.html')});
 });
 </script>
+</body>
+</html>
