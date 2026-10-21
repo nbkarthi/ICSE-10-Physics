@@ -1,0 +1,125 @@
+<title>ICSE Physics Dashboard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=IBM+Plex+Mono:wght@400;500&family=Nunito+Sans:wght@400;600;700&display=swap">
+<style>
+/* Layout: header with progress summary, then a grid of 12 chapter cards (open ones first-class, upcoming ones muted). */
+:root{
+  --bg:#f2f5f9; --panel:#ffffff; --fg:#14202e; --muted:#566779; --line:#d3dce6; --soft:#e8eef6;
+  --accent:#1d4ed8; --accent-fg:#ffffff; --ok:#2f7d32; --ok-bg:#e3f2e4; --soon:#7a5b00; --soon-bg:#fbf0cf;
+  --font-display:'Bricolage Grotesque',system-ui,sans-serif; --font-body:'Nunito Sans',system-ui,sans-serif; --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1621; --panel:#162231; --fg:#e7eef6; --muted:#9db0c4; --line:#2a3b4e; --soft:#1d2d40;
+  --accent:#7aa2ff; --accent-fg:#0e1621; --ok:#74d680; --ok-bg:#1c3322; --soon:#f2c94c; --soon-bg:#3a3012; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1621; --panel:#162231; --fg:#e7eef6; --muted:#9db0c4; --line:#2a3b4e; --soft:#1d2d40;
+  --accent:#7aa2ff; --accent-fg:#0e1621; --ok:#74d680; --ok-bg:#1c3322; --soon:#f2c94c; --soon-bg:#3a3012; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:16px;line-height:1.5;
+  padding-inline:16px;padding-block:24px 48px}
+.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+header{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:flex-end;justify-content:space-between}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0}
+h1{font-family:var(--font-display);font-size:clamp(1.9rem,6vw,2.8rem);line-height:1.05;margin:4px 0 0;text-wrap:balance}
+.sub{margin:8px 0 0;color:var(--muted);max-width:52ch}
+.progress{min-width:220px;flex:0 1 280px}
+.progress b{font-family:var(--font-mono);font-size:13px;font-weight:500}
+.bar{height:10px;border-radius:5px;background:var(--soft);margin-top:6px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.progress small{display:block;margin-top:6px;color:var(--muted)}
+h2{font-family:var(--font-display);font-size:1.25rem;margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));gap:16px;list-style:none;margin:0;padding:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card.soon{background:transparent;border-style:dashed}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.num{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
+.pill{font-family:var(--font-mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:99px}
+.pill.open{background:var(--soft);color:var(--accent)}
+.pill.done{background:var(--ok-bg);color:var(--ok)}
+.pill.soon{background:var(--soon-bg);color:var(--soon)}
+.card h3{font-family:var(--font-display);font-size:1.15rem;line-height:1.2;margin:0;text-wrap:balance}
+.card.soon h3{color:var(--muted)}
+.topics{margin:0;color:var(--muted);font-size:14px}
+.actions{margin-top:auto;display:flex;flex-wrap:wrap;gap:8px;padding-top:6px}
+a.btn,button{font:inherit;font-weight:700;font-size:14px;min-height:44px;padding:0 16px;border-radius:8px;border:1px solid var(--accent);
+  background:var(--accent);color:var(--accent-fg);text-decoration:none;display:inline-flex;align-items:center;cursor:pointer}
+button.ghost{background:transparent;color:var(--accent)}
+a.btn:focus-visible,button:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+.note{color:var(--muted);font-size:14px;margin:0}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <p class="eyebrow">ICSE Class 10 · Physics</p>
+      <h1>Your Physics Dashboard</h1>
+      <p class="sub">Pick a chapter to learn with simulations, worked examples and practice questions. More chapters open as they are ready.</p>
+    </div>
+    <div class="progress" aria-live="polite">
+      <b id="pcount">0 of 12 chapters done</b>
+      <div class="bar" role="progressbar" aria-label="Chapters completed" aria-valuemin="0" aria-valuemax="12" aria-valuenow="0" id="pbar"><i id="pfill"></i></div>
+      <small id="pavail">2 chapters open</small>
+    </div>
+  </header>
+
+  <section aria-labelledby="ch">
+    <h2 id="ch" style="margin-bottom:12px">Chapters</h2>
+    <ol class="grid" id="grid"></ol>
+  </section>
+
+  <p class="note">Progress is saved in this browser only. Google sign-in will be added so it follows you across devices.</p>
+</div>
+
+<script>
+// href is relative to this file. A chapter without href is shown as "Coming soon".
+var CHAPTERS=[
+  {n:1,title:'Force',topics:'Moment of a force, couples, equilibrium, centre of gravity, uniform circular motion',href:'chapter-01-force.html'},
+  {n:2,title:'Work, Energy and Power',topics:'Work, kinetic and potential energy, conservation of energy, power'},
+  {n:3,title:'Machines',topics:'Levers, pulleys, mechanical advantage, velocity ratio, efficiency, inclined plane'},
+  {n:4,title:'Refraction of Light at Plane Surfaces',topics:'Snell’s law, refractive index, critical angle, total internal reflection',href:'chapter-04-refraction-plane-surfaces.html'},
+  {n:5,title:'Refraction through Lens',topics:'Convex and concave lenses, image formation, lens formula, magnification, uses'},
+  {n:6,title:'Spectrum',topics:'Dispersion, prism, colours, electromagnetic spectrum, infrared and ultraviolet'},
+  {n:7,title:'Sound',topics:'Reflection of sound, echo, natural and forced vibrations, resonance, loudness and pitch'},
+  {n:8,title:'Current Electricity',topics:'Ohm’s law, resistance, series and parallel circuits, electric power and energy'},
+  {n:9,title:'Electrical Power and Household Circuits',topics:'Live, neutral and earth wires, fuse, switch, circuit breaker, power rating'},
+  {n:10,title:'Electromagnetism',topics:'Magnetic effect of current, electromagnets, motor, electromagnetic induction, generator, transformer'},
+  {n:11,title:'Calorimetry',topics:'Heat capacity, specific heat capacity, change of state, latent heat'},
+  {n:12,title:'Radioactivity',topics:'Alpha, beta and gamma radiation, nuclear fission and fusion, half-life'}
+];
+var KEY='icse10-physics-done';
+function load(){try{return JSON.parse(localStorage.getItem(KEY))||[]}catch(e){return []}}
+function save(a){try{localStorage.setItem(KEY,JSON.stringify(a))}catch(e){}}
+var done=load();
+function el(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+function render(){
+  var g=document.getElementById('grid');g.textContent='';
+  var open=0,fin=0;
+  CHAPTERS.forEach(function(c){
+    var isOpen=!!c.href,isDone=done.indexOf(c.n)>-1;
+    if(isOpen)open++;if(isDone)fin++;
+    var li=el('li','card'+(isOpen?'':' soon'));
+    var top=el('div','top');
+    top.appendChild(el('span','num','Chapter '+c.n));
+    top.appendChild(el('span','pill '+(isDone?'done':isOpen?'open':'soon'),isDone?'Done':isOpen?'Open':'Coming soon'));
+    li.appendChild(top);
+    li.appendChild(el('h3',null,c.title));
+    li.appendChild(el('p','topics',c.topics));
+    if(isOpen){
+      var a=el('div','actions');
+      var l=el('a','btn',isDone?'Review chapter':'Start learning');l.href=c.href;a.appendChild(l);
+      var b=el('button','ghost',isDone?'Mark not done':'Mark as done');
+      b.type='button';b.addEventListener('click',function(){
+        var i=done.indexOf(c.n);if(i>-1)done.splice(i,1);else done.push(c.n);
+        save(done);render();
+      });
+      a.appendChild(b);li.appendChild(a);
+    }
+    g.appendChild(li);
+  });
+  document.getElementById('pcount').textContent=fin+' of 12 chapters done';
+  document.getElementById('pfill').style.width=(fin/12*100)+'%';
+  document.getElementById('pbar').setAttribute('aria-valuenow',fin);
+  document.getElementById('pavail').textContent=open+' of 12 chapters open';
+}
+render();
+</script>
